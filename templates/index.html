@@ -1,480 +1,708 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-```
-<title>SENSEX Option Bot</title>
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+   content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>SENSEX Bot</title>
 
 <style>
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-        font-family: Inter, Arial, sans-serif;
-    }
 
-    body {
-        min-height: 100vh;
-        background:
-            radial-gradient(circle at top right, #172554 0%, transparent 35%),
-            radial-gradient(circle at bottom left, #052e16 0%, transparent 30%),
-            #070b14;
-        color: #f8fafc;
-    }
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
 
-    /* ================= HEADER ================= */
+body {
 
-    .header {
-        height: 72px;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
-        background: rgba(7,11,20,0.85);
-        backdrop-filter: blur(18px);
+    background: #070b12;
 
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+    color: #ffffff;
 
-        padding: 0 6%;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
+    min-height: 100vh;
 
-    .brand {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
+    overflow-x: hidden;
 
-    .logo {
-        width: 40px;
-        height: 40px;
+}
 
-        display: flex;
-        align-items: center;
-        justify-content: center;
 
-        border-radius: 12px;
+/* ================= HEADER ================= */
 
-        background: linear-gradient(135deg, #2563eb, #06b6d4);
+.header {
 
-        font-size: 20px;
-    }
+    height: 64px;
 
-    .brand-text h2 {
-        font-size: 17px;
-        font-weight: 700;
-    }
+    display: flex;
 
-    .brand-text span {
-        font-size: 11px;
-        color: #64748b;
-    }
+    align-items: center;
 
-    .market {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    justify-content: space-between;
 
-        font-size: 12px;
-        color: #94a3b8;
-    }
+    padding: 0 18px;
 
-    .market-dot {
-        width: 8px;
-        height: 8px;
-        background: #22c55e;
-        border-radius: 50%;
-        box-shadow: 0 0 12px #22c55e;
-    }
+    background: #0c111b;
 
-    /* ================= MAIN ================= */
+    border-bottom: 1px solid #1c2635;
+
+    position: sticky;
+
+    top: 0;
+
+    z-index: 100;
+
+}
+
+.brand {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+}
+
+.logo {
+
+    width: 38px;
+
+    height: 38px;
+
+    border-radius: 10px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background: #2563eb;
+
+    font-size: 19px;
+
+}
+
+.brand h2 {
+
+    font-size: 15px;
+
+    font-weight: 700;
+
+}
+
+.brand p {
+
+    font-size: 10px;
+
+    color: #718096;
+
+    margin-top: 2px;
+
+}
+
+.market {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    font-size: 10px;
+
+    color: #94a3b8;
+
+}
+
+.market-dot {
+
+    width: 7px;
+
+    height: 7px;
+
+    border-radius: 50%;
+
+    background: #22c55e;
+
+}
+
+
+/* ================= PAGE ================= */
+
+.container {
+
+    width: 100%;
+
+    max-width: 520px;
+
+    margin: auto;
+
+    padding: 20px 15px 40px;
+
+}
+
+
+/* ================= WELCOME ================= */
+
+.welcome {
+
+    margin-bottom: 16px;
+
+}
+
+.welcome h1 {
+
+    font-size: 25px;
+
+    font-weight: 700;
+
+}
+
+.welcome p {
+
+    margin-top: 5px;
+
+    color: #718096;
+
+    font-size: 12px;
+
+}
+
+
+/* ================= BOT STATUS ================= */
+
+.status-card {
+
+    background: #101722;
+
+    border: 1px solid #202b3b;
+
+    border-radius: 18px;
+
+    padding: 20px;
+
+    margin-bottom: 14px;
+
+}
+
+.status-top {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+}
+
+.status-label {
+
+    color: #718096;
+
+    font-size: 10px;
+
+    font-weight: 700;
+
+    letter-spacing: 1px;
+
+}
+
+.status-badge {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    padding: 6px 10px;
+
+    border-radius: 20px;
+
+    background: #1f1720;
+
+    color: #ef4444;
+
+    font-size: 10px;
+
+    font-weight: 700;
+
+}
+
+.status-badge.running {
+
+    background: #0d2519;
+
+    color: #22c55e;
+
+}
+
+.status-dot {
+
+    width: 7px;
+
+    height: 7px;
+
+    border-radius: 50%;
+
+    background: #ef4444;
+
+}
+
+.status-badge.running .status-dot {
+
+    background: #22c55e;
+
+    box-shadow: 0 0 8px #22c55e;
+
+}
+
+.status-main {
+
+    margin-top: 18px;
+
+}
+
+.status-main h2 {
+
+    font-size: 25px;
+
+}
+
+.status-main p {
+
+    color: #64748b;
+
+    font-size: 11px;
+
+    margin-top: 5px;
+
+}
+
+
+/* ================= PROFIT ================= */
+
+.profit-card {
+
+    background: linear-gradient(
+        145deg,
+        #0f2419,
+        #0c1713
+    );
+
+    border: 1px solid #1c4d32;
+
+    border-radius: 18px;
+
+    padding: 22px;
+
+    margin-bottom: 14px;
+
+}
+
+.profit-label {
+
+    color: #86a895;
+
+    font-size: 10px;
+
+    font-weight: 700;
+
+    letter-spacing: 1px;
+
+}
+
+.profit {
+
+    font-size: 36px;
+
+    font-weight: 800;
+
+    color: #22c55e;
+
+    margin-top: 8px;
+
+    letter-spacing: -1px;
+
+}
+
+.profit-sub {
+
+    color: #64806e;
+
+    font-size: 10px;
+
+    margin-top: 5px;
+
+}
+
+
+/* ================= STATISTICS ================= */
+
+.stats {
+
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 12px;
+
+    margin-bottom: 14px;
+
+}
+
+.stat {
+
+    background: #101722;
+
+    border: 1px solid #202b3b;
+
+    border-radius: 16px;
+
+    padding: 18px;
+
+    min-height: 105px;
+
+}
+
+.stat-icon {
+
+    font-size: 17px;
+
+    margin-bottom: 12px;
+
+}
+
+.stat-label {
+
+    color: #718096;
+
+    font-size: 10px;
+
+}
+
+.stat-value {
+
+    margin-top: 5px;
+
+    font-size: 21px;
+
+    font-weight: 700;
+
+    word-break: break-word;
+
+}
+
+
+/* ================= CURRENT TRADE ================= */
+
+.trade-card {
+
+    background: #101722;
+
+    border: 1px solid #202b3b;
+
+    border-radius: 18px;
+
+    padding: 18px;
+
+    margin-bottom: 14px;
+
+}
+
+.trade-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    margin-bottom: 15px;
+
+}
+
+.trade-header h3 {
+
+    font-size: 14px;
+
+}
+
+.trade-header span {
+
+    color: #64748b;
+
+    font-size: 10px;
+
+}
+
+.trade-content {
+
+    background: #080d15;
+
+    border-radius: 12px;
+
+    padding: 15px;
+
+    color: #94a3b8;
+
+    font-size: 12px;
+
+    min-height: 48px;
+
+    display: flex;
+
+    align-items: center;
+
+}
+
+
+/* ================= CONTROLS ================= */
+
+.control-card {
+
+    background: #101722;
+
+    border: 1px solid #202b3b;
+
+    border-radius: 18px;
+
+    padding: 18px;
+
+    margin-bottom: 14px;
+
+}
+
+.control-card h3 {
+
+    font-size: 14px;
+
+    margin-bottom: 4px;
+
+}
+
+.control-card p {
+
+    color: #64748b;
+
+    font-size: 10px;
+
+    margin-bottom: 16px;
+
+}
+
+.button {
+
+    width: 100%;
+
+    height: 52px;
+
+    border: none;
+
+    border-radius: 13px;
+
+    font-size: 14px;
+
+    font-weight: 700;
+
+    color: white;
+
+    margin-bottom: 10px;
+
+    cursor: pointer;
+
+}
+
+.start {
+
+    background: #16a34a;
+
+}
+
+.stop {
+
+    background: #dc2626;
+
+    margin-bottom: 0;
+
+}
+
+.button:active {
+
+    transform: scale(0.98);
+
+}
+
+.button:disabled {
+
+    opacity: 0.45;
+
+}
+
+
+/* ================= MESSAGE ================= */
+
+.message {
+
+    text-align: center;
+
+    min-height: 18px;
+
+    margin-top: 12px;
+
+    font-size: 10px;
+
+    color: #64748b;
+
+}
+
+
+/* ================= CONFIGURATION ================= */
+
+.config {
+
+    background: #101722;
+
+    border: 1px solid #202b3b;
+
+    border-radius: 18px;
+
+    overflow: hidden;
+
+    margin-bottom: 20px;
+
+}
+
+.config-title {
+
+    padding: 18px;
+
+    border-bottom: 1px solid #202b3b;
+
+}
+
+.config-title h3 {
+
+    font-size: 14px;
+
+}
+
+.config-title p {
+
+    font-size: 10px;
+
+    color: #64748b;
+
+    margin-top: 4px;
+
+}
+
+.config-row {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    padding: 15px 18px;
+
+    border-bottom: 1px solid #192331;
+
+}
+
+.config-row:last-child {
+
+    border-bottom: none;
+
+}
+
+.config-row span {
+
+    color: #718096;
+
+    font-size: 11px;
+
+}
+
+.config-row strong {
+
+    font-size: 12px;
+
+}
+
+
+/* ================= FOOTER ================= */
+
+.footer {
+
+    text-align: center;
+
+    color: #374151;
+
+    font-size: 9px;
+
+    padding-bottom: 15px;
+
+}
+
+
+/* ================= TABLET / DESKTOP ================= */
+
+@media (min-width: 700px) {
 
     .container {
-        width: 90%;
-        max-width: 1150px;
-        margin: auto;
-        padding: 45px 0;
-    }
 
-    .hero {
-        margin-bottom: 28px;
-    }
+        max-width: 700px;
 
-    .hero h1 {
-        font-size: clamp(28px, 5vw, 42px);
-        font-weight: 800;
-        letter-spacing: -1px;
-        margin-bottom: 8px;
-    }
-
-    .hero p {
-        color: #64748b;
-        font-size: 14px;
-    }
-
-    /* ================= STATUS ================= */
-
-    .status-panel {
-        position: relative;
-        overflow: hidden;
-
-        padding: 25px;
-
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 20px;
-
-        background: linear-gradient(
-            135deg,
-            rgba(30,41,59,0.8),
-            rgba(15,23,42,0.8)
-        );
-
-        box-shadow: 0 20px 50px rgba(0,0,0,0.25);
-
-        margin-bottom: 20px;
-    }
-
-    .status-panel::after {
-        content: "";
-
-        position: absolute;
-        width: 180px;
-        height: 180px;
-
-        right: -70px;
-        top: -90px;
-
-        background: #2563eb;
-        filter: blur(90px);
-        opacity: 0.25;
-    }
-
-    .status-label {
-        color: #64748b;
-        font-size: 11px;
-        letter-spacing: 1.5px;
-        font-weight: 700;
-        margin-bottom: 12px;
-    }
-
-    .status-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 20px;
-    }
-
-    .status {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-
-        font-size: 25px;
-        font-weight: 800;
-    }
-
-    .status-indicator {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #ef4444;
-    }
-
-    .status.running .status-indicator {
-        background: #22c55e;
-        box-shadow: 0 0 16px #22c55e;
-    }
-
-    .status.running {
-        color: #22c55e;
-    }
-
-    .status.stopped {
-        color: #ef4444;
-    }
-
-    /* ================= STAT CARDS ================= */
-
-    .cards {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
-        margin-bottom: 20px;
-    }
-
-    .card {
-        position: relative;
-        overflow: hidden;
-
-        padding: 22px;
-
-        border-radius: 18px;
-
-        background: rgba(15,23,42,0.75);
-        border: 1px solid rgba(255,255,255,0.07);
-
-        transition: 0.25s ease;
-    }
-
-    .card:hover {
-        transform: translateY(-3px);
-        border-color: rgba(255,255,255,0.14);
-    }
-
-    .card-icon {
-        width: 38px;
-        height: 38px;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        border-radius: 10px;
-
-        background: rgba(37,99,235,0.12);
-
-        margin-bottom: 18px;
-
-        font-size: 18px;
-    }
-
-    .card-title {
-        font-size: 12px;
-        color: #64748b;
-        margin-bottom: 7px;
-    }
-
-    .card-value {
-        font-size: 26px;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-    }
-
-    #profit {
-        color: #22c55e;
-    }
-
-    /* ================= CONTROLS ================= */
-
-    .control-panel {
-        background: rgba(15,23,42,0.75);
-        border: 1px solid rgba(255,255,255,0.07);
-
-        border-radius: 18px;
-
-        padding: 24px;
-
-        margin-bottom: 20px;
-    }
-
-    .panel-title {
-        font-size: 15px;
-        font-weight: 700;
-        margin-bottom: 5px;
-    }
-
-    .panel-subtitle {
-        color: #64748b;
-        font-size: 12px;
-        margin-bottom: 20px;
-    }
-
-    .buttons {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-    }
-
-    button {
-        border: none;
-        outline: none;
-
-        padding: 15px;
-
-        border-radius: 12px;
-
-        color: white;
-        font-size: 14px;
-        font-weight: 700;
-
-        cursor: pointer;
-
-        transition: 0.2s ease;
-    }
-
-    #startBtn {
-        background: linear-gradient(135deg, #16a34a, #22c55e);
-        box-shadow: 0 8px 25px rgba(34,197,94,0.18);
-    }
-
-    #stopBtn {
-        background: linear-gradient(135deg, #dc2626, #ef4444);
-        box-shadow: 0 8px 25px rgba(239,68,68,0.15);
-    }
-
-    button:hover {
-        transform: translateY(-2px);
-        filter: brightness(1.08);
-    }
-
-    button:active {
-        transform: scale(0.98);
-    }
-
-    .message {
-        text-align: center;
-        margin-top: 15px;
-
-        color: #64748b;
-        font-size: 12px;
-
-        min-height: 18px;
-    }
-
-    /* ================= CONFIG ================= */
-
-    .config {
-        background: rgba(15,23,42,0.75);
-        border: 1px solid rgba(255,255,255,0.07);
-
-        border-radius: 18px;
-
-        padding: 24px;
-    }
-
-    .config-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-
-        margin-bottom: 20px;
-    }
-
-    .config-header h2 {
-        font-size: 16px;
-    }
-
-    .badge {
-        font-size: 10px;
-        font-weight: 700;
-
-        padding: 6px 10px;
-
-        border-radius: 20px;
-
-        background: rgba(37,99,235,0.12);
-        color: #60a5fa;
-    }
-
-    .config-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-    }
-
-    .config-item {
-        padding: 15px;
-
-        border-radius: 12px;
-
-        background: rgba(2,6,23,0.55);
-        border: 1px solid rgba(255,255,255,0.04);
-    }
-
-    .config-item span {
-        display: block;
-
-        color: #64748b;
-        font-size: 10px;
-
-        margin-bottom: 7px;
-    }
-
-    .config-item strong {
-        font-size: 14px;
-    }
-
-    /* ================= FOOTER ================= */
-
-    .footer {
-        text-align: center;
-        padding-top: 25px;
-
-        color: #334155;
-        font-size: 10px;
-    }
-
-    /* ================= MOBILE ================= */
-
-    @media (max-width: 800px) {
-
-        .header {
-            padding: 0 5%;
-        }
-
-        .container {
-            width: 92%;
-            padding: 30px 0;
-        }
-
-        .cards {
-            grid-template-columns: 1fr;
-        }
-
-        .config-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
+        padding-top: 35px;
 
     }
 
-    @media (max-width: 500px) {
+    .stats {
 
-        .header {
-            height: 65px;
-        }
+        grid-template-columns: repeat(2, 1fr);
 
-        .brand-text h2 {
-            font-size: 14px;
-        }
-
-        .market {
-            display: none;
-        }
-
-        .hero {
-            margin-bottom: 22px;
-        }
-
-        .hero h1 {
-            font-size: 28px;
-        }
-
-        .status-panel {
-            padding: 20px;
-        }
-
-        .status {
-            font-size: 22px;
-        }
-
-        .buttons {
-            grid-template-columns: 1fr;
-        }
-
-        .config-grid {
-            grid-template-columns: 1fr 1fr;
-        }
-
-        .card-value {
-            font-size: 24px;
-        }
     }
+
+}
+
+
+/* ================= SMALL PHONES ================= */
+
+@media (max-width: 360px) {
+
+    .container {
+
+        padding-left: 12px;
+
+        padding-right: 12px;
+
+    }
+
+    .welcome h1 {
+
+        font-size: 22px;
+
+    }
+
+    .profit {
+
+        font-size: 32px;
+
+    }
+
+}
+
 </style>
-```
 
 </head>
 
@@ -491,16 +719,20 @@
         📈
     </div>
 
-    <div class="brand-text">
+    <div>
         <h2>SENSEX BOT</h2>
-        <span>Kotak Neo Trading System</span>
+        <p>Kotak Neo</p>
     </div>
 
 </div>
 
+
 <div class="market">
+
     <div class="market-dot"></div>
+
     BSE F&O
+
 </div>
 ```
 
@@ -511,190 +743,307 @@
 <main class="container">
 
 ```
-<section class="hero">
+<!-- WELCOME -->
+
+<div class="welcome">
 
     <h1>Trading Dashboard</h1>
 
     <p>
-        Monitor and control your SENSEX option trading bot.
+        Monitor your automated trading system
     </p>
 
-</section>
+</div>
 
 
-<!-- ================= STATUS ================= -->
 
-<section class="status-panel">
+<!-- STATUS -->
 
-    <div class="status-label">
-        BOT STATUS
+<div class="status-card">
+
+    <div class="status-top">
+
+        <div class="status-label">
+            BOT STATUS
+        </div>
+
+        <div id="statusBadge"
+             class="status-badge">
+
+            <div class="status-dot"></div>
+
+            <span id="statusText">
+                STOPPED
+            </span>
+
+        </div>
+
     </div>
 
-    <div id="status" class="status stopped">
 
-        <div class="status-indicator"></div>
+    <div class="status-main">
 
-        <span id="statusText">
-            STOPPED
+        <h2 id="statusTitle">
+            Bot is stopped
+        </h2>
+
+        <p id="statusDescription">
+            Start the bot to begin monitoring the market.
+        </p>
+
+    </div>
+
+</div>
+
+
+
+<!-- PROFIT -->
+
+<div class="profit-card">
+
+    <div class="profit-label">
+        CUMULATIVE PROFIT
+    </div>
+
+    <div id="profit"
+         class="profit">
+
+        ₹0.00
+
+    </div>
+
+    <div class="profit-sub">
+        Total realized profit from completed trades
+    </div>
+
+</div>
+
+
+
+<!-- STATISTICS -->
+
+<div class="stats">
+
+
+    <div class="stat">
+
+        <div class="stat-icon">
+            📊
+        </div>
+
+        <div class="stat-label">
+            COMPLETED TRADES
+        </div>
+
+        <div id="trades"
+             class="stat-value">
+
+            0
+
+        </div>
+
+    </div>
+
+
+    <div class="stat">
+
+        <div class="stat-icon">
+            ⚡
+        </div>
+
+        <div class="stat-label">
+            CURRENT TRADE
+        </div>
+
+        <div id="currentTrade"
+             class="stat-value">
+
+            None
+
+        </div>
+
+    </div>
+
+
+</div>
+
+
+
+<!-- CURRENT TRADE -->
+
+<div class="trade-card">
+
+    <div class="trade-header">
+
+        <h3>Current Trade</h3>
+
+        <span>
+            LIVE
         </span>
 
     </div>
 
-</section>
 
+    <div id="tradeDetails"
+         class="trade-content">
 
-<!-- ================= STATISTICS ================= -->
-
-<section class="cards">
-
-    <div class="card">
-
-        <div class="card-icon">
-            ₹
-        </div>
-
-        <div class="card-title">
-            CUMULATIVE PROFIT
-        </div>
-
-        <div id="profit" class="card-value">
-            ₹0.00
-        </div>
+        No active trade
 
     </div>
 
-
-    <div class="card">
-
-        <div class="card-icon">
-            ↗
-        </div>
-
-        <div class="card-title">
-            COMPLETED TRADES
-        </div>
-
-        <div id="trades" class="card-value">
-            0
-        </div>
-
-    </div>
+</div>
 
 
-    <div class="card">
 
-        <div class="card-icon">
-            ⚡
-        </div>
+<!-- CONTROLS -->
 
-        <div class="card-title">
-            CURRENT TRADE
-        </div>
+<div class="control-card">
 
-        <div id="currentTrade" class="card-value">
-            None
-        </div>
+    <h3>Bot Controls</h3>
 
-    </div>
-
-</section>
+    <p>
+        Control automated trading from your phone
+    </p>
 
 
-<!-- ================= CONTROLS ================= -->
+    <button
+        id="startBtn"
+        class="button start"
+        onclick="startBot()">
 
-<section class="control-panel">
+        ▶ &nbsp; START BOT
 
-    <div class="panel-title">
-        Bot Controls
-    </div>
+    </button>
 
-    <div class="panel-subtitle">
-        Start or stop automated trading
-    </div>
 
-    <div class="buttons">
+    <button
+        id="stopBtn"
+        class="button stop"
+        onclick="stopBot()">
 
-        <button id="startBtn" onclick="startBot()">
-            ▶ &nbsp; START BOT
-        </button>
+        ■ &nbsp; STOP BOT
 
-        <button id="stopBtn" onclick="stopBot()">
-            ■ &nbsp; STOP BOT
-        </button>
+    </button>
 
-    </div>
 
-    <div id="message" class="message">
+    <div id="message"
+         class="message">
+
         Ready
-    </div>
-
-</section>
-
-
-<!-- ================= CONFIGURATION ================= -->
-
-<section class="config">
-
-    <div class="config-header">
-
-        <h2>Strategy Configuration</h2>
-
-        <div class="badge">
-            LIVE STRATEGY
-        </div>
 
     </div>
 
+</div>
 
-    <div class="config-grid">
 
-        <div class="config-item">
-            <span>UNDERLYING</span>
-            <strong>SENSEX</strong>
-        </div>
 
-        <div class="config-item">
-            <span>EXCHANGE</span>
-            <strong>BSE F&O</strong>
-        </div>
+<!-- CONFIGURATION -->
 
-        <div class="config-item">
-            <span>TARGET PREMIUM</span>
-            <strong>₹10</strong>
-        </div>
+<div class="config">
 
-        <div class="config-item">
-            <span>LOT SIZE</span>
-            <strong>20</strong>
-        </div>
 
-        <div class="config-item">
-            <span>TARGET PROFIT</span>
-            <strong>₹5</strong>
-        </div>
+    <div class="config-title">
 
-        <div class="config-item">
-            <span>STOP LOSS</span>
-            <strong>₹-20</strong>
-        </div>
+        <h3>
+            Strategy Configuration
+        </h3>
 
-        <div class="config-item">
-            <span>PROFIT TARGET</span>
-            <strong>₹1000</strong>
-        </div>
-
-        <div class="config-item">
-            <span>ENTRY TIME</span>
-            <strong>15:00</strong>
-        </div>
+        <p>
+            Current bot parameters
+        </p>
 
     </div>
 
-</section>
+
+    <div class="config-row">
+
+        <span>Underlying</span>
+
+        <strong>SENSEX</strong>
+
+    </div>
+
+
+    <div class="config-row">
+
+        <span>Exchange</span>
+
+        <strong>BSE F&O</strong>
+
+    </div>
+
+
+    <div class="config-row">
+
+        <span>Target Premium</span>
+
+        <strong>₹10</strong>
+
+    </div>
+
+
+    <div class="config-row">
+
+        <span>Target Profit</span>
+
+        <strong>₹5</strong>
+
+    </div>
+
+
+    <div class="config-row">
+
+        <span>Stop Loss</span>
+
+        <strong>₹-20</strong>
+
+    </div>
+
+
+    <div class="config-row">
+
+        <span>Total Profit Target</span>
+
+        <strong>₹1000</strong>
+
+    </div>
+
+
+    <div class="config-row">
+
+        <span>Lot Size</span>
+
+        <strong>20</strong>
+
+    </div>
+
+
+    <div class="config-row">
+
+        <span>Last Entry</span>
+
+        <strong>15:00</strong>
+
+    </div>
+
+
+    <div class="config-row">
+
+        <span>Force Exit</span>
+
+        <strong>15:15</strong>
+
+    </div>
+
+
+</div>
+
 
 
 <div class="footer">
+
     SENSEX Option Bot • Kotak Neo
+
 </div>
 ```
 
@@ -704,13 +1053,16 @@
 
 <script>
 
+
 async function getStatus() {
 
     try {
 
-        const response = await fetch("/api/status");
+        const response =
+            await fetch("/api/status");
 
-        const data = await response.json();
+        const data =
+            await response.json();
 
         updateDashboard(data);
 
@@ -726,22 +1078,40 @@ async function getStatus() {
 }
 
 
+
 function updateDashboard(data) {
 
-    const statusElement =
-        document.getElementById("status");
+
+    const statusBadge =
+        document.getElementById("statusBadge");
+
 
     const statusText =
         document.getElementById("statusText");
 
+
+    const statusTitle =
+        document.getElementById("statusTitle");
+
+
+    const statusDescription =
+        document.getElementById("statusDescription");
+
+
     const profitElement =
         document.getElementById("profit");
+
 
     const tradesElement =
         document.getElementById("trades");
 
+
     const currentTradeElement =
         document.getElementById("currentTrade");
+
+
+    const tradeDetails =
+        document.getElementById("tradeDetails");
 
 
     const running =
@@ -770,27 +1140,41 @@ function updateDashboard(data) {
         null;
 
 
+
     /* STATUS */
 
     if (running) {
 
-        statusElement.className =
-            "status running";
+        statusBadge.className =
+            "status-badge running";
 
         statusText.innerText =
             "RUNNING";
+
+        statusTitle.innerText =
+            "Bot is running";
+
+        statusDescription.innerText =
+            "The trading system is monitoring the market.";
 
     }
 
     else {
 
-        statusElement.className =
-            "status stopped";
+        statusBadge.className =
+            "status-badge";
 
         statusText.innerText =
             "STOPPED";
 
+        statusTitle.innerText =
+            "Bot is stopped";
+
+        statusDescription.innerText =
+            "Start the bot to begin monitoring the market.";
+
     }
+
 
 
     /* PROFIT */
@@ -802,10 +1186,12 @@ function updateDashboard(data) {
         "₹" + numericProfit.toFixed(2);
 
 
+
     /* TRADES */
 
     tradesElement.innerText =
         trades;
+
 
 
     /* CURRENT TRADE */
@@ -813,26 +1199,37 @@ function updateDashboard(data) {
     currentTradeElement.innerText =
         currentTrade || "None";
 
+
+    tradeDetails.innerText =
+        currentTrade || "No active trade";
+
 }
 
 
-/* ================= START BOT ================= */
+
+/* ================= START ================= */
 
 async function startBot() {
+
 
     const message =
         document.getElementById("message");
 
+
     const button =
         document.getElementById("startBtn");
+
 
     message.innerText =
         "Starting bot...";
 
-    button.disabled = true;
+
+    button.disabled =
+        true;
 
 
     try {
+
 
         const response =
             await fetch("/api/start", {
@@ -856,7 +1253,8 @@ async function startBot() {
             "Bot started";
 
 
-        getStatus();
+        await getStatus();
+
 
     }
 
@@ -867,32 +1265,41 @@ async function startBot() {
 
     }
 
+
     finally {
 
-        button.disabled = false;
+        button.disabled =
+            false;
 
     }
 
 }
 
 
-/* ================= STOP BOT ================= */
+
+/* ================= STOP ================= */
 
 async function stopBot() {
+
 
     const message =
         document.getElementById("message");
 
+
     const button =
         document.getElementById("stopBtn");
+
 
     message.innerText =
         "Stopping bot...";
 
-    button.disabled = true;
+
+    button.disabled =
+        true;
 
 
     try {
+
 
         const response =
             await fetch("/api/stop", {
@@ -916,7 +1323,8 @@ async function stopBot() {
             "Bot stopped";
 
 
-        getStatus();
+        await getStatus();
+
 
     }
 
@@ -927,25 +1335,31 @@ async function stopBot() {
 
     }
 
+
     finally {
 
-        button.disabled = false;
+        button.disabled =
+            false;
 
     }
 
 }
 
 
+
 /* ================= AUTO REFRESH ================= */
 
 getStatus();
+
 
 setInterval(
     getStatus,
     3000
 );
 
+
 </script>
 
 </body>
+
 </html>
