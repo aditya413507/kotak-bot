@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>SENSEX Option Bot</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: #0f172a;
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+            padding: 30px 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: #1e293b;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .status {
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .running {
+            color: #22c55e;
+        }
+
+        .stopped {
+            color: #ef4444;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: #1e293b;
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .card-title {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 25px;
+            font-weight: bold;
+        }
+
+        .controls {
+            background: #1e293b;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        button {
+            border: none;
+            padding: 13px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        #startBtn {
+            background: #22c55e;
+            color: white;
+        }
+
+        #stopBtn {
+            background: #ef4444;
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 15px;
+            color: #94a3b8;
+        }
+
+        .info {
+            margin-top: 20px;
+            background: #020617;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .info p {
+            margin: 8px 0;
+            color: #cbd5e1;
+        }
+
+        @media (max-width: 700px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>📈 SENSEX Option Bot</h1>
+
+    <div class="subtitle">
+        Kotak Neo Trading Dashboard
+    </div>
+
+    <!-- STATUS -->
+    <div class="status-card">
+
+        <div>BOT STATUS</div>
+
+        <div id="status" class="status stopped">
+            STOPPED
+        </div>
+
+    </div>
+
+
+    <!-- STATISTICS -->
+    <div class="cards">
+
+        <div class="card">
+            <div class="card-title">
+                Cumulative Profit
+            </div>
+
+            <div id="profit" class="card-value">
+                ₹0.00
+            </div>
+        </div>
+
+
+        <div class="card">
+            <div class="card-title">
+                Completed Trades
+            </div>
+
+            <div id="trades" class="card-value">
+                0
+            </div>
+        </div>
+
+
+        <div class="card">
+            <div class="card-title">
+                Current Trade
+            </div>
+
+            <div id="currentTrade" class="card-value">
+                None
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- CONTROLS -->
+    <div class="controls">
+
+        <button id="startBtn" onclick="startBot()">
+            ▶ START BOT
+        </button>
+
+        <button id="stopBtn" onclick="stopBot()">
+            ■ STOP BOT
+        </button>
+
+        <div id="message" class="message">
+            Ready
+        </div>
+
+    </div>
+
+
+    <!-- BOT INFORMATION -->
+    <div class="info">
+
+        <h2>Bot Configuration</h2>
+
+        <p>
+            <strong>Underlying:</strong> SENSEX
+        </p>
+
+        <p>
+            <strong>Exchange:</strong> BSE F&O
+        </p>
+
+        <p>
+            <strong>Target Premium:</strong> ₹10
+        </p>
+
+        <p>
+            <strong>Target Profit:</strong> ₹5
+        </p>
+
+        <p>
+            <strong>Stop Loss:</strong> ₹-20
+        </p>
+
+        <p>
+            <strong>Total Profit Target:</strong> ₹1000
+        </p>
+
+        <p>
+            <strong>Lot Size:</strong> 20
+        </p>
+
+    </div>
+
+</div>
+
+
+<script>
+
+async function getStatus() {
+
+    try {
+
+        const response = await fetch("/api/status");
+
+        const data = await response.json();
+
+        updateDashboard(data);
+
+    } catch (error) {
+
+        document.getElementById("message").innerText =
+            "Unable to connect to bot";
+
+    }
+
+}
+
+
+function updateDashboard(data) {
+
+    const statusElement =
+        document.getElementById("status");
+
+    const profitElement =
+        document.getElementById("profit");
+
+    const tradesElement =
+        document.getElementById("trades");
+
+    const currentTradeElement =
+        document.getElementById("currentTrade");
+
+
+    /*
+     * Support common state names used by the bot.
+     */
+
+    const running =
+        data.running ??
+        data.bot_running ??
+        false;
+
+
+    const profit =
+        data.total_profit ??
+        data.cumulative_profit ??
+        data.profit ??
+        0;
+
+
+    const trades =
+        data.completed_trades ??
+        data.trade_count ??
+        data.trades ??
+        0;
+
+
+    const currentTrade =
+        data.current_trade ??
+        data.current_trade_id ??
+        null;
+
+
+    if (running) {
+
+        statusElement.innerText = "RUNNING";
+
+        statusElement.className =
+            "status running";
+
+    } else {
+
+        statusElement.innerText = "STOPPED";
+
+        statusElement.className =
+            "status stopped";
+
+    }
+
+
+    profitElement.innerText =
+        "₹" + Number(profit).toFixed(2);
+
+
+    tradesElement.innerText =
+        trades;
+
+
+    currentTradeElement.innerText =
+        currentTrade || "None";
+
+}
+
+
+async function startBot() {
+
+    const message =
+        document.getElementById("message");
+
+    message.innerText =
+        "Starting bot...";
+
+
+    try {
+
+        const response =
+            await fetch("/api/start", {
+
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                }
+
+            });
+
+
+        const data =
+            await response.json();
+
+
+        message.innerText =
+            data.message ||
+            data.status ||
+            "Bot started";
+
+
+        getStatus();
+
+
+    } catch (error) {
+
+        message.innerText =
+            "Error starting bot";
+
+    }
+
+}
+
+
+async function stopBot() {
+
+    const message =
+        document.getElementById("message");
+
+    message.innerText =
+        "Stopping bot...";
+
+
+    try {
+
+        const response =
+            await fetch("/api/stop", {
+
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                }
+
+            });
+
+
+        const data =
+            await response.json();
+
+
+        message.innerText =
+            data.message ||
+            data.status ||
+            "Bot stopped";
+
+
+        getStatus();
+
+
+    } catch (error) {
+
+        message.innerText =
+            "Error stopping bot";
+
+    }
+
+}
+
+
+/*
+ * Automatically refresh status
+ * every 3 seconds.
+ */
+
+getStatus();
+
+setInterval(
+    getStatus,
+    3000
+);
+
+</script>
+
+</body>
+</html>
