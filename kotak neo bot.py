@@ -13,7 +13,7 @@ import config
 # CONFIGURATION
 # ============================================================
 
-LIVE_TRADING = True
+LIVE_TRADING = False
 
 UNDERLYING = "SENSEX"
 EXCHANGE = "bse_fo"
