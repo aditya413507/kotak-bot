@@ -2,10 +2,12 @@ import os
 import csv
 import time
 import threading
+import traceback
 from datetime import datetime, time as dt_time
 from concurrent.futures import ThreadPoolExecutor
 
 from neo_api_client import NeoAPI
+
 import config
 
 
@@ -13,7 +15,7 @@ import config
 # CONFIGURATION
 # ============================================================
 
-LIVE_TRADING = False
+LIVE_TRADING = True
 
 UNDERLYING = "SENSEX"
 EXCHANGE = "bse_fo"
@@ -32,103 +34,156 @@ FORCE_EXIT_TIME = dt_time(15, 15)
 CHAIN_REFRESH_SECONDS = 5
 REST_DELAY = 0.5
 
-TRADE_LOG_FILE = "trade_log.csv"
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
+
+TRADE_LOG_FILE = os.path.join(
+    BASE_DIR,
+    "trade_log.csv"
+)
 
 
 # ============================================================
 # GLOBAL STATE
 # ============================================================
 
+client = None
+
 bot_running = False
 bot_thread = None
 
-client = None
-login_done = False
-
 state_lock = threading.Lock()
 
-total_profit = 0.0
-completed_trades = 0
-
-current_trade = None
-
-last_error = None
+active_trade = None
 
 
 # ============================================================
-# STATE
+# BOT STATE
 # ============================================================
 
-def get_state():
+bot_state = {
+    "running": False,
+    "mode": "LIVE" if LIVE_TRADING else "PAPER",
+    "status": "Stopped",
+    "message": "",
+    "last_error": "",
+    "last_update": "",
 
-    with state_lock:
+    "spot": 0.0,
+    "expiry": "",
 
-        return {
-            "running": bot_running,
-            "total_profit": round(total_profit, 2),
-            "completed_trades": completed_trades,
-            "current_trade": current_trade,
-            "login_done": login_done,
-            "error": last_error
-        }
+    # --------------------------------------------------------
+    # CURRENT ₹10 CALL
+    # --------------------------------------------------------
+
+    "call_target_strike": 0.0,
+    "call_strike": 0.0,
+    "call_symbol": "",
+    "call_ltp": 0.0,
+
+    # --------------------------------------------------------
+    # CURRENT ₹10 PUT
+    # --------------------------------------------------------
+
+    "put_target_strike": 0.0,
+    "put_strike": 0.0,
+    "put_symbol": "",
+    "put_ltp": 0.0,
+
+    # --------------------------------------------------------
+    # ACTIVE TRADE
+    # --------------------------------------------------------
+
+    "trigger_side": "",
+    "active_trade": False,
+
+    "trade_number": 0,
+
+    "trade_call_symbol": "",
+    "trade_put_symbol": "",
+
+    "call_entry": 0.0,
+    "put_entry": 0.0,
+
+    "call_current": 0.0,
+    "put_current": 0.0,
+
+    "call_quantity": 0,
+    "put_quantity": 0,
+
+    "combined_pnl": 0.0,
+
+    # --------------------------------------------------------
+    # PROFIT TRACKING
+    # --------------------------------------------------------
+
+    "completed_trades": 0,
+    "last_trade_profit": 0.0,
+    "total_profit": 0.0,
+    "last_trade_time": "",
+    "max_trades": 0
+}
 
 
 # ============================================================
 # LOGGING
 # ============================================================
 
-def log_trade(
-    trade_number,
-    ce_symbol,
-    pe_symbol,
-    ce_entry,
-    pe_entry,
-    ce_exit,
-    pe_exit,
-    profit,
-    cumulative_profit
-):
+def log(message):
 
-    file_exists = os.path.exists(TRADE_LOG_FILE)
+    timestamp = datetime.now().strftime("%H:%M:%S")
 
-    with open(
-        TRADE_LOG_FILE,
-        "a",
-        newline="",
-        encoding="utf-8"
-    ) as f:
+    print(f"[{timestamp}] {message}")
 
-        writer = csv.writer(f)
+    with state_lock:
+        bot_state["message"] = str(message)
+        bot_state["last_update"] = timestamp
 
-        if not file_exists:
 
-            writer.writerow([
-                "time",
-                "trade_number",
-                "ce_symbol",
-                "pe_symbol",
-                "ce_entry",
-                "pe_entry",
-                "ce_exit",
-                "pe_exit",
-                "profit",
-                "cumulative_profit"
-            ])
+# ============================================================
+# UPDATE STATE
+# ============================================================
 
-        writer.writerow([
-            datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
-            trade_number,
-            ce_symbol,
-            pe_symbol,
-            ce_entry,
-            pe_entry,
-            ce_exit,
-            pe_exit,
-            round(profit, 2),
-            round(cumulative_profit, 2)
-        ])
+def update_state(**kwargs):
+
+    with state_lock:
+
+        for key, value in kwargs.items():
+
+            if key in bot_state:
+                bot_state[key] = value
+
+        bot_state["last_update"] = (
+            datetime.now().strftime("%H:%M:%S")
+        )
+
+
+# ============================================================
+# GET STATE
+# ============================================================
+
+def get_state():
+
+    with state_lock:
+        return dict(bot_state)
+
+
+# ============================================================
+# SAFE FLOAT
+# ============================================================
+
+def safe_float(value, default=0.0):
+
+    try:
+
+        if value is None:
+            return default
+
+        return float(value)
+
+    except Exception:
+        return default
 
 
 # ============================================================
@@ -138,120 +193,881 @@ def log_trade(
 def login():
 
     global client
-    global login_done
-    global last_error
 
     try:
 
+        log("Logging in to NeoAPI...")
+
         client = NeoAPI(
-            consumer_key=config.CONSUMER_KEY,
-            environment="prod"
+            environment="prod",
+            consumer_key=config.CONSUMER_KEY
         )
 
-        print("Logging in...")
+        # ----------------------------------------------------
+        # TOTP LOGIN
+        # ----------------------------------------------------
 
-        login_response = client.totp_login(
+        response = client.totp_login(
             mobile_number=config.MOBILE_NUMBER,
             ucc=config.UCC,
             totp=config.TOTP
         )
 
-        print("TOTP login response:")
-        print(login_response)
+        log(
+            f"TOTP login response: {response}"
+        )
 
-        validate_response = client.totp_validate(
+        # ----------------------------------------------------
+        # MPIN VALIDATION
+        # ----------------------------------------------------
+
+        response = client.totp_validate(
             mpin=config.MPIN
         )
 
-        print("MPIN validation response:")
-        print(validate_response)
+        log(
+            f"TOTP validation response: {response}"
+        )
 
-        login_done = True
-        last_error = None
+        # ----------------------------------------------------
+        # CHECK RESPONSE
+        # ----------------------------------------------------
 
-        print("Login successful.")
+        if isinstance(response, dict):
+
+            if response.get("stat") == "Not_Ok":
+
+                error_message = (
+                    response.get("emsg")
+                    or response.get("message")
+                    or str(response)
+                )
+
+                raise Exception(
+                    f"MPIN validation failed: {error_message}"
+                )
+
+        log("Login successful.")
+
+        update_state(
+            status="Logged in",
+            last_error=""
+        )
 
         return True
 
     except Exception as e:
 
-        login_done = False
-        last_error = str(e)
+        error_message = (
+            f"{type(e).__name__}: {e}"
+        )
 
-        print("LOGIN ERROR:", e)
+        log(
+            f"LOGIN FAILED: {error_message}"
+        )
+
+        update_state(
+            status="Login failed",
+            last_error=error_message
+        )
+
+        client = None
 
         return False
 
 
 # ============================================================
-# OPTION CHAIN
+# GET NEAREST EXPIRY
 # ============================================================
 
-def get_option_chain():
+def get_nearest_expiry():
 
-    global last_error
+    try:
 
-    if client is None:
+        if client is None:
+            return None
 
-        last_error = (
-            "NeoAPI client is None."
+        response = client.expiries(
+            exchange=EXCHANGE,
+            underlying=UNDERLYING
         )
 
-        print(
-            "OPTION CHAIN ERROR: client is None"
+        log(
+            f"Expiry response: {response}"
+        )
+
+        if not isinstance(response, dict):
+            return None
+
+        expiries = response.get(
+            "expiries",
+            []
+        )
+
+        if not expiries:
+            return None
+
+        # ----------------------------------------------------
+        # Convert expiry values to strings for safe sorting
+        # ----------------------------------------------------
+
+        expiries = [
+            str(expiry)
+            for expiry in expiries
+            if expiry is not None
+        ]
+
+        if not expiries:
+            return None
+
+        nearest = sorted(expiries)[0]
+
+        log(
+            f"Nearest expiry: {nearest}"
+        )
+
+        return nearest
+
+    except Exception as e:
+
+        error_message = (
+            f"{type(e).__name__}: {e}"
+        )
+
+        log(
+            f"EXPIRY API ERROR: {error_message}"
+        )
+
+        update_state(
+            last_error=error_message
         )
 
         return None
 
+
+# ============================================================
+# GET OPTION CHAIN
+# ============================================================
+
+def get_option_chain(expiry=None):
+
     try:
 
-        print()
-        print("=" * 60)
-        print("REQUESTING SENSEX OPTION CHAIN")
-        print("=" * 60)
+        if client is None:
 
-        response = client.option_chain(
-            exchange=EXCHANGE,
-            underlying=UNDERLYING,
-            instrument_type="option",
-            count=100
-        )
-
-        print(
-            "Option-chain response type:",
-            type(response).__name__
-        )
-
-        print(
-            "Option-chain response:"
-        )
-
-        print(response)
-
-        if response is None:
-
-            last_error = (
-                "NeoAPI returned None for option chain."
+            log(
+                "Option chain requested but client is None."
             )
 
             return None
 
-        if isinstance(response, dict):
+        response = client.option_chain(
+            exchange=EXCHANGE,
+            underlying=UNDERLYING,
+            expiry=expiry,
+            instrument_type="option",
+            count=100
+        )
 
-            print(
-                "Response keys:",
-                list(response.keys())
-            )
+        log(
+            f"Option chain response type: "
+            f"{type(response).__name__}"
+        )
+
+        # ----------------------------------------------------
+        # API ERROR
+        # ----------------------------------------------------
+
+        if isinstance(response, dict):
 
             if response.get("stat") == "Not_Ok":
 
-                last_error = (
-                    "NeoAPI option-chain error: "
-                    + str(response)
+                log(
+                    f"Option chain API error: {response}"
                 )
 
-                print(
-                    last_error
+                update_state(
+                    last_error=str(response)
+                )
+
+                return None
+
+        else:
+
+            log(
+                "Option-chain response is not a dictionary."
+            )
+
+            return None
+
+        # ----------------------------------------------------
+        # DIRECT FORMAT
+        # ----------------------------------------------------
+
+        if (
+            "calls" in response
+            or "puts" in response
+            or "spot" in response
+        ):
+
+            return response
+
+        # ----------------------------------------------------
+        # DATA FORMAT
+        # ----------------------------------------------------
+
+        data = response.get("data")
+
+        if isinstance(data, dict):
+
+            return data
+
+        # ----------------------------------------------------
+        # DEBUG
+        # ----------------------------------------------------
+
+        log(
+            "Could not find option-chain data. "
+            f"Keys: {list(response.keys())}"
+        )
+
+        return None
+
+    except Exception as e:
+
+        error_message = (
+            f"{type(e).__name__}: {e}"
+        )
+
+        log(
+            f"OPTION CHAIN ERROR: {error_message}"
+        )
+
+        print(
+            traceback.format_exc()
+        )
+
+        update_state(
+            last_error=error_message
+        )
+
+        return None
+
+
+# ============================================================
+# GET SENSEX SPOT
+# ============================================================
+
+def get_sensex_spot(chain_data):
+
+    try:
+
+        if not isinstance(chain_data, dict):
+            return 0.0
+
+        spot_data = chain_data.get(
+            "spot",
+            {}
+        )
+
+        if isinstance(spot_data, dict):
+
+            spot = safe_float(
+                spot_data.get("ltp")
+            )
+
+            if spot > 0:
+                return spot
+
+        # ----------------------------------------------------
+        # Alternative spot formats
+        # ----------------------------------------------------
+
+        for key in (
+            "spotPrice",
+            "underlyingValue",
+            "ltp"
+        ):
+
+            value = safe_float(
+                chain_data.get(key)
+            )
+
+            if value > 1000:
+                return value
+
+        log(
+            "SENSEX spot not found."
+        )
+
+        return 0.0
+
+    except Exception as e:
+
+        log(
+            f"Spot parsing error: {e}"
+        )
+
+        return 0.0
+
+
+# ============================================================
+# PARSE OPTION CHAIN
+# ============================================================
+
+def parse_option_chain(chain_data):
+
+    calls = []
+    puts = []
+
+    try:
+
+        if not isinstance(chain_data, dict):
+
+            log(
+                "ERROR: chain_data is not a dictionary."
+            )
+
+            return [], []
+
+        option_records = []
+
+        # ----------------------------------------------------
+        # DIRECT CALLS
+        # ----------------------------------------------------
+
+        if isinstance(
+            chain_data.get("calls"),
+            list
+        ):
+
+            option_records.extend(
+                chain_data["calls"]
+            )
+
+        # ----------------------------------------------------
+        # DIRECT PUTS
+        # ----------------------------------------------------
+
+        if isinstance(
+            chain_data.get("puts"),
+            list
+        ):
+
+            option_records.extend(
+                chain_data["puts"]
+            )
+
+        # ----------------------------------------------------
+        # DATA LIST
+        # ----------------------------------------------------
+
+        data = chain_data.get("data")
+
+        if isinstance(data, list):
+
+            option_records.extend(data)
+
+        # ----------------------------------------------------
+        # SEARCH NESTED LISTS
+        # ----------------------------------------------------
+
+        if not option_records:
+
+            for value in chain_data.values():
+
+                if isinstance(value, list):
+
+                    for item in value:
+
+                        if not isinstance(item, dict):
+                            continue
+
+                        if "inst" in item:
+
+                            option_records.append(item)
+
+        log(
+            f"Option records discovered: "
+            f"{len(option_records)}"
+        )
+
+        # ----------------------------------------------------
+        # REMOVE DUPLICATES
+        # ----------------------------------------------------
+
+        unique_records = []
+
+        seen = set()
+
+        for item in option_records:
+
+            if not isinstance(item, dict):
+                continue
+
+            inst = item.get(
+                "inst",
+                {}
+            )
+
+            if not isinstance(inst, dict):
+                continue
+
+            neo_symbol = inst.get(
+                "neoSymbol",
+                ""
+            )
+
+            if (
+                neo_symbol
+                and neo_symbol not in seen
+            ):
+
+                seen.add(neo_symbol)
+
+                unique_records.append(item)
+
+        # ----------------------------------------------------
+        # PARSE OPTIONS
+        # ----------------------------------------------------
+
+        for item in unique_records:
+
+            try:
+
+                inst = item.get(
+                    "inst",
+                    {}
+                )
+
+                quote = item.get(
+                    "quote",
+                    {}
+                )
+
+                if not isinstance(inst, dict):
+                    continue
+
+                if not isinstance(quote, dict):
+                    quote = {}
+
+                strike = safe_float(
+                    inst.get("strkPrc")
+                )
+
+                ltp = safe_float(
+                    quote.get("ltp")
+                )
+
+                symbol = inst.get(
+                    "symbol",
+                    ""
+                )
+
+                neo_symbol = inst.get(
+                    "neoSymbol",
+                    ""
+                )
+
+                opt_type = str(
+                    inst.get(
+                        "optType",
+                        ""
+                    )
+                ).upper()
+
+                if (
+                    strike <= 0
+                    or not symbol
+                    or not neo_symbol
+                ):
+                    continue
+
+                if ltp <= 0:
+                    continue
+
+                option = {
+                    "strike": strike,
+                    "ltp": ltp,
+                    "neoSymbol": neo_symbol,
+                    "symbol": symbol,
+                    "optType": opt_type
+                }
+
+                if opt_type == "CE":
+
+                    calls.append(option)
+
+                elif opt_type == "PE":
+
+                    puts.append(option)
+
+            except Exception as e:
+
+                log(
+                    f"Option item parse error: {e}"
+                )
+
+        log(
+            f"Parsed option chain | "
+            f"CALLs={len(calls)} | "
+            f"PUTs={len(puts)}"
+        )
+
+        return calls, puts
+
+    except Exception as e:
+
+        log(
+            f"OPTION PARSER ERROR: {e}"
+        )
+
+        print(
+            traceback.format_exc()
+        )
+
+        return [], []
+
+
+# ============================================================
+# FIND OTM OPTION CLOSEST TO ₹10
+# ============================================================
+
+def find_otm_closest_to_premium(
+    options,
+    spot,
+    option_type,
+    target_premium
+):
+
+    valid_options = []
+
+    for option in options:
+
+        strike = safe_float(
+            option.get("strike")
+        )
+
+        ltp = safe_float(
+            option.get("ltp")
+        )
+
+        if strike <= 0:
+            continue
+
+        if ltp <= 0:
+            continue
+
+        # ----------------------------------------------------
+        # CALL OTM
+        # ----------------------------------------------------
+
+        if option_type == "CE":
+
+            if strike > spot:
+
+                valid_options.append(
+                    option
+                )
+
+        # ----------------------------------------------------
+        # PUT OTM
+        # ----------------------------------------------------
+
+        elif option_type == "PE":
+
+            if strike < spot:
+
+                valid_options.append(
+                    option
+                )
+
+    if not valid_options:
+        return None
+
+    # --------------------------------------------------------
+    # PRIMARY:
+    # Premium closest to ₹10
+    #
+    # SECONDARY:
+    # Strike closest to spot
+    # --------------------------------------------------------
+
+    return min(
+        valid_options,
+        key=lambda x: (
+            abs(
+                x["ltp"] - target_premium
+            ),
+            abs(
+                x["strike"] - spot
+            )
+        )
+    )
+
+
+# ============================================================
+# GET CURRENT LTP
+# ============================================================
+
+def get_current_ltp(neo_symbol):
+
+    try:
+
+        if client is None:
+            return 0.0
+
+        if not neo_symbol:
+            return 0.0
+
+        parts = str(
+            neo_symbol
+        ).split("|")
+
+        if len(parts) != 2:
+
+            log(
+                f"Invalid neoSymbol: {neo_symbol}"
+            )
+
+            return 0.0
+
+        exchange_segment = parts[0]
+        instrument_token = parts[1]
+
+        instrument_tokens = [
+            {
+                "instrument_token": str(
+                    instrument_token
+                ),
+                "exchange_segment":
+                    exchange_segment
+            }
+        ]
+
+        response = client.quotes(
+            instrument_tokens=instrument_tokens,
+            quote_type="ltp"
+        )
+
+        # ----------------------------------------------------
+        # DICTIONARY RESPONSE
+        # ----------------------------------------------------
+
+        if isinstance(response, dict):
+
+            data = response.get(
+                "data"
+            )
+
+            if isinstance(data, list):
+
+                if data:
+
+                    quote = data[0]
+
+                    if isinstance(
+                        quote,
+                        dict
+                    ):
+
+                        value = (
+                            quote.get("ltp")
+                            or quote.get("lp")
+                            or quote.get(
+                                "lastTradedPrice"
+                            )
+                            or quote.get(
+                                "lastPrice"
+                            )
+                        )
+
+                        price = safe_float(
+                            value
+                        )
+
+                        if price > 0:
+                            return price
+
+            if isinstance(data, dict):
+
+                value = (
+                    data.get("ltp")
+                    or data.get("lp")
+                    or data.get(
+                        "lastTradedPrice"
+                    )
+                    or data.get(
+                        "lastPrice"
+                    )
+                )
+
+                price = safe_float(
+                    value
+                )
+
+                if price > 0:
+                    return price
+
+            value = (
+                response.get("ltp")
+                or response.get("lp")
+                or response.get(
+                    "lastTradedPrice"
+                )
+            )
+
+            price = safe_float(
+                value
+            )
+
+            if price > 0:
+                return price
+
+        # ----------------------------------------------------
+        # LIST RESPONSE
+        # ----------------------------------------------------
+
+        if isinstance(response, list):
+
+            if response:
+
+                quote = response[0]
+
+                if isinstance(
+                    quote,
+                    dict
+                ):
+
+                    value = (
+                        quote.get("ltp")
+                        or quote.get("lp")
+                        or quote.get(
+                            "lastTradedPrice"
+                        )
+                        or quote.get(
+                            "lastPrice"
+                        )
+                    )
+
+                    price = safe_float(
+                        value
+                    )
+
+                    if price > 0:
+                        return price
+
+        return 0.0
+
+    except Exception as e:
+
+        log(
+            f"LTP error for "
+            f"{neo_symbol}: {e}"
+        )
+
+        update_state(
+            last_error=str(e)
+        )
+
+        return 0.0
+
+
+# ============================================================
+# LOT SIZE
+# ============================================================
+
+def get_lot_size(option):
+
+    return LOT_SIZE
+
+
+# ============================================================
+# PLACE MARKET ORDER
+# ============================================================
+
+def place_market_order(
+    option,
+    quantity,
+    transaction_type
+):
+
+    if not option:
+        return None
+
+    symbol = option.get(
+        "symbol",
+        ""
+    )
+
+    neo_symbol = option.get(
+        "neoSymbol",
+        ""
+    )
+
+    action = (
+        "BUY"
+        if transaction_type == "B"
+        else "SELL"
+    )
+
+    log(
+        f"{action} {symbol} "
+        f"Qty={quantity}"
+    )
+
+    # ========================================================
+    # PAPER TRADING
+    # ========================================================
+
+    if not LIVE_TRADING:
+
+        log(
+            f"PAPER ORDER: "
+            f"{action} {symbol} x {quantity}"
+        )
+
+        return {
+            "stat": "Ok",
+            "status": "PAPER",
+            "symbol": symbol,
+            "neoSymbol": neo_symbol,
+            "quantity": quantity
+        }
+
+    # ========================================================
+    # LIVE ORDER
+    # ========================================================
+
+    try:
+
+        response = client.place_order(
+            exchange_segment=EXCHANGE,
+            product="MIS",
+            price="0",
+            order_type="MKT",
+            quantity=str(quantity),
+            validity="DAY",
+            trading_symbol=symbol,
+            transaction_type=transaction_type
+        )
+
+        log(
+            f"{action} response: {response}"
+        )
+
+        if isinstance(
+            response,
+            dict
+        ):
+
+            if response.get(
+                "stat"
+            ) == "Not_Ok":
+
+                log(
+                    f"{action} order failed: "
+                    f"{response}"
                 )
 
                 return None
@@ -260,966 +1076,1168 @@ def get_option_chain():
 
     except Exception as e:
 
-        last_error = (
-            f"Option chain error: "
-            f"{type(e).__name__}: {e}"
+        log(
+            f"Order placement error "
+            f"for {symbol}: {e}"
         )
 
-        print(
-            last_error
-        )
-
-        print(
-            traceback.format_exc()
+        update_state(
+            last_error=str(e)
         )
 
         return None
-# ============================================================
-# NORMALIZE OPTION CHAIN
-# ============================================================
-
-def extract_chain_rows(response):
-
-    if not response:
-        return []
-
-    data = response.get("data")
-
-    if isinstance(data, dict):
-
-        data = data.get("data")
-
-    if not isinstance(data, list):
-
-        return []
-
-    return data
 
 
 # ============================================================
-# NUMBER CONVERSION
+# GET ENTRY PRICE
 # ============================================================
 
-def to_float(value):
+def get_entry_price(option):
 
-    try:
+    price = get_current_ltp(
+        option["neoSymbol"]
+    )
 
-        return float(value)
+    if price <= 0:
 
-    except:
+        price = safe_float(
+            option.get("ltp")
+        )
+
+    return price
+
+
+# ============================================================
+# CALCULATE COMBINED P&L
+# ============================================================
+
+def calculate_combined_pnl():
+
+    global active_trade
+
+    if active_trade is None:
+        return 0.0
+
+    call_ltp = get_current_ltp(
+        active_trade["call"]["neoSymbol"]
+    )
+
+    time.sleep(
+        REST_DELAY
+    )
+
+    put_ltp = get_current_ltp(
+        active_trade["put"]["neoSymbol"]
+    )
+
+    if call_ltp <= 0 or put_ltp <= 0:
 
         return None
 
+    active_trade["call_current"] = (
+        call_ltp
+    )
 
-# ============================================================
-# FIND OTM OPTIONS NEAREST TO ₹10 PREMIUM
-# ============================================================
+    active_trade["put_current"] = (
+        put_ltp
+    )
 
-def find_otm_options(response):
+    call_pnl = (
+        call_ltp
+        - active_trade["call_entry"]
+    ) * active_trade["call_quantity"]
 
-    rows = extract_chain_rows(response)
+    put_pnl = (
+        put_ltp
+        - active_trade["put_entry"]
+    ) * active_trade["put_quantity"]
 
-    if not rows:
-        return None, None
+    combined_pnl = (
+        call_pnl
+        + put_pnl
+    )
 
-    spot = None
-
-    # --------------------------------------------------------
-    # Try to identify spot
-    # --------------------------------------------------------
-
-    for row in rows:
-
-        if not isinstance(row, dict):
-            continue
-
-        for key in (
-            "spot",
-            "spotPrice",
-            "underlyingValue",
-            "ltp"
-        ):
-
-            value = to_float(row.get(key))
-
-            if value is not None and value > 1000:
-
-                spot = value
-                break
-
-        if spot is not None:
-            break
-
-    # --------------------------------------------------------
-    # If spot isn't available, use strike center
-    # --------------------------------------------------------
-
-    strikes = []
-
-    for row in rows:
-
-        if not isinstance(row, dict):
-            continue
-
-        strike = None
-
-        for key in (
-            "strikePrice",
-            "strike",
-            "stkPrc"
-        ):
-
-            strike = to_float(row.get(key))
-
-            if strike is not None:
-                break
-
-        if strike is not None:
-            strikes.append(strike)
-
-    if spot is None and strikes:
-
-        spot = sum(strikes) / len(strikes)
-
-    if spot is None:
-
-        print("Could not determine SENSEX spot.")
-
-        return None, None
-
-    calls = []
-    puts = []
-
-    # --------------------------------------------------------
-    # Extract CE / PE
-    # --------------------------------------------------------
-
-    for row in rows:
-
-        if not isinstance(row, dict):
-            continue
-
-        strike = None
-
-        for key in (
-            "strikePrice",
-            "strike",
-            "stkPrc"
-        ):
-
-            strike = to_float(row.get(key))
-
-            if strike is not None:
-                break
-
-        if strike is None:
-            continue
-
-        # Possible formats from API responses
-        ce = (
-            row.get("CE")
-            or row.get("ce")
-            or row.get("call")
-            or row.get("Call")
-        )
-
-        pe = (
-            row.get("PE")
-            or row.get("pe")
-            or row.get("put")
-            or row.get("Put")
-        )
-
-        if isinstance(ce, dict):
-
-            ltp = (
-                ce.get("ltp")
-                or ce.get("LTP")
-                or ce.get("lastPrice")
-                or ce.get("last_traded_price")
-            )
-
-            symbol = (
-                ce.get("tradingSymbol")
-                or ce.get("trading_symbol")
-                or ce.get("trdSym")
-                or ce.get("symbol")
-            )
-
-            token = (
-                ce.get("instrumentToken")
-                or ce.get("instrument_token")
-                or ce.get("tok")
-            )
-
-            ltp = to_float(ltp)
-
-            if (
-                ltp is not None
-                and symbol
-                and strike > spot
-            ):
-
-                calls.append({
-                    "symbol": symbol,
-                    "strike": strike,
-                    "ltp": ltp,
-                    "token": token
-                })
-
-        if isinstance(pe, dict):
-
-            ltp = (
-                pe.get("ltp")
-                or pe.get("LTP")
-                or pe.get("lastPrice")
-                or pe.get("last_traded_price")
-            )
-
-            symbol = (
-                pe.get("tradingSymbol")
-                or pe.get("trading_symbol")
-                or pe.get("trdSym")
-                or pe.get("symbol")
-            )
-
-            token = (
-                pe.get("instrumentToken")
-                or pe.get("instrument_token")
-                or pe.get("tok")
-            )
-
-            ltp = to_float(ltp)
-
-            if (
-                ltp is not None
-                and symbol
-                and strike < spot
-            ):
-
-                puts.append({
-                    "symbol": symbol,
-                    "strike": strike,
-                    "ltp": ltp,
-                    "token": token
-                })
-
-    if not calls or not puts:
-
-        print("Could not find both OTM CE and PE.")
-
-        return None, None
-
-    # --------------------------------------------------------
-    # IMPORTANT:
-    #
-    # Select the OTM CE and PE whose PREMIUM/LTP is closest
-    # to ₹10.
-    #
-    # Secondary condition:
-    # closest strike to spot.
-    # --------------------------------------------------------
-
-    calls.sort(
-        key=lambda x: (
-            abs(x["ltp"] - TARGET_OPTION_PREMIUM),
-            abs(x["strike"] - spot)
+    update_state(
+        call_current=call_ltp,
+        put_current=put_ltp,
+        combined_pnl=round(
+            combined_pnl,
+            2
         )
     )
 
-    puts.sort(
-        key=lambda x: (
-            abs(x["ltp"] - TARGET_OPTION_PREMIUM),
-            abs(x["strike"] - spot)
+    return combined_pnl
+
+
+# ============================================================
+# ENTER PAIR
+# ============================================================
+
+def enter_pair(call, put):
+
+    global active_trade
+
+    if active_trade is not None:
+
+        log(
+            "Trade already active. "
+            "New entry blocked."
         )
+
+        return False
+
+    call_quantity = get_lot_size(
+        call
     )
 
-    return calls[0], puts[0]
-
-
-# ============================================================
-# QUOTE
-# ============================================================
-
-def get_ltp(option):
-
-    if client is None:
-        return None
-
-    token = option.get("token")
-
-    if not token:
-        return None
-
-    try:
-
-        response = client.quotes(
-            instrument_tokens=[
-                {
-                    "instrument_token": str(token),
-                    "exchange_segment": EXCHANGE
-                }
-            ],
-            quote_type="all"
-        )
-
-        return extract_ltp_from_quote(response)
-
-    except Exception as e:
-
-        print(
-            "Quote error for",
-            option.get("symbol"),
-            e
-        )
-
-        return None
-
-
-def extract_ltp_from_quote(response):
-
-    if not response:
-        return None
-
-    data = response.get("data")
-
-    if isinstance(data, dict):
-
-        data = data.get("data") or data
-
-    if isinstance(data, list) and data:
-
-        data = data[0]
-
-    if not isinstance(data, dict):
-
-        return None
-
-    for key in (
-        "ltp",
-        "LTP",
-        "lastPrice",
-        "last_traded_price",
-        "lastTradedPrice",
-        "lp"
-    ):
-
-        value = to_float(data.get(key))
-
-        if value is not None:
-            return value
-
-    return None
-
-
-# ============================================================
-# PLACE BUY ORDER
-# ============================================================
-
-def buy_option(option):
-
-    if not LIVE_TRADING:
-
-        print(
-            "PAPER BUY:",
-            option["symbol"]
-        )
-
-        return {
-            "success": True,
-            "price": option["ltp"]
-        }
-
-    try:
-
-        response = client.place_order(
-
-            exchange_segment=EXCHANGE,
-
-            product="NRML",
-
-            price="0",
-
-            order_type="MKT",
-
-            quantity=str(LOT_SIZE),
-
-            validity="DAY",
-
-            trading_symbol=option["symbol"],
-
-            transaction_type="B",
-
-            tag="SENSEX_BOT"
-        )
-
-        print(
-            "BUY RESPONSE:",
-            response
-        )
-
-        price = get_ltp(option)
-
-        if price is None:
-
-            price = option["ltp"]
-
-        return {
-            "success": True,
-            "price": price,
-            "response": response
-        }
-
-    except Exception as e:
-
-        print(
-            "BUY ERROR:",
-            option["symbol"],
-            e
-        )
-
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-
-# ============================================================
-# PLACE SELL ORDER
-# ============================================================
-
-def sell_option(option):
-
-    if not LIVE_TRADING:
-
-        print(
-            "PAPER SELL:",
-            option["symbol"]
-        )
-
-        return {
-            "success": True,
-            "price": option["ltp"]
-        }
-
-    try:
-
-        response = client.place_order(
-
-            exchange_segment=EXCHANGE,
-
-            product="NRML",
-
-            price="0",
-
-            order_type="MKT",
-
-            quantity=str(LOT_SIZE),
-
-            validity="DAY",
-
-            trading_symbol=option["symbol"],
-
-            transaction_type="S",
-
-            tag="SENSEX_BOT"
-        )
-
-        print(
-            "SELL RESPONSE:",
-            response
-        )
-
-        price = get_ltp(option)
-
-        if price is None:
-
-            price = option["ltp"]
-
-        return {
-            "success": True,
-            "price": price,
-            "response": response
-        }
-
-    except Exception as e:
-
-        print(
-            "SELL ERROR:",
-            option["symbol"],
-            e
-        )
-
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-
-# ============================================================
-# TIME CHECK
-# ============================================================
-
-def current_time():
-
-    return datetime.now().time()
-
-
-def before_entry_cutoff():
-
-    return current_time() < LAST_ENTRY_TIME
-
-
-def force_exit_time_reached():
-
-    return current_time() >= FORCE_EXIT_TIME
-
-
-# ============================================================
-# ENTER BOTH OPTIONS SIMULTANEOUSLY
-# ============================================================
-
-def enter_both(ce, pe):
-
-    print()
-    print("==============================================")
-    print("BUYING CE + PE")
-    print("==============================================")
+    put_quantity = get_lot_size(
+        put
+    )
+
+    log(
+        "=============================================="
+    )
+
+    log(
+        "ENTERING CALL + PUT"
+    )
+
+    log(
+        f"CALL: {call['symbol']} "
+        f"@ approx ₹{call['ltp']:.2f}"
+    )
+
+    log(
+        f"PUT: {put['symbol']} "
+        f"@ approx ₹{put['ltp']:.2f}"
+    )
+
+    # ========================================================
+    # BUY BOTH AS CLOSE TO SIMULTANEOUS AS POSSIBLE
+    # ========================================================
 
     with ThreadPoolExecutor(
         max_workers=2
     ) as executor:
 
-        ce_future = executor.submit(
-            buy_option,
-            ce
+        call_future = executor.submit(
+            place_market_order,
+            call,
+            call_quantity,
+            "B"
         )
 
-        pe_future = executor.submit(
-            buy_option,
-            pe
+        put_future = executor.submit(
+            place_market_order,
+            put,
+            put_quantity,
+            "B"
         )
 
-        ce_result = ce_future.result()
-        pe_result = pe_future.result()
+        call_order = call_future.result()
 
-    if not ce_result.get("success"):
-        return None
+        put_order = put_future.result()
 
-    if not pe_result.get("success"):
+    # ========================================================
+    # CALL FAILED
+    # ========================================================
 
-        # CE was bought but PE failed.
-        # Attempt to close CE immediately.
+    if not call_order:
 
-        print(
-            "PE BUY FAILED. Closing CE."
+        log(
+            "CALL order failed."
         )
 
-        sell_option(ce)
+        # If PUT unexpectedly succeeded,
+        # close it immediately.
 
-        return None
+        if put_order:
 
-    return {
-        "ce_entry": float(
-            ce_result["price"]
-        ),
+            log(
+                "PUT succeeded while CALL failed. "
+                "Closing PUT."
+            )
 
-        "pe_entry": float(
-            pe_result["price"]
+            place_market_order(
+                put,
+                put_quantity,
+                "S"
+            )
+
+        return False
+
+    # ========================================================
+    # PUT FAILED
+    # ========================================================
+
+    if not put_order:
+
+        log(
+            "PUT order failed."
         )
+
+        log(
+            "CALL was already bought. "
+            "Closing CALL."
+        )
+
+        place_market_order(
+            call,
+            call_quantity,
+            "S"
+        )
+
+        return False
+
+    # ========================================================
+    # GET ACTUAL ENTRY PRICES
+    # ========================================================
+
+    call_entry = get_entry_price(
+        call
+    )
+
+    time.sleep(
+        REST_DELAY
+    )
+
+    put_entry = get_entry_price(
+        put
+    )
+
+    if call_entry <= 0:
+
+        call_entry = safe_float(
+            call["ltp"]
+        )
+
+    if put_entry <= 0:
+
+        put_entry = safe_float(
+            put["ltp"]
+        )
+
+    # ========================================================
+    # TRADE NUMBER
+    # ========================================================
+
+    with state_lock:
+
+        trade_number = (
+            bot_state["completed_trades"]
+            + 1
+        )
+
+    # ========================================================
+    # CREATE ACTIVE TRADE
+    # ========================================================
+
+    active_trade = {
+
+        "trade_number": trade_number,
+
+        "call": call,
+
+        "put": put,
+
+        "call_entry": call_entry,
+
+        "put_entry": put_entry,
+
+        "call_current": call_entry,
+
+        "put_current": put_entry,
+
+        "call_quantity": call_quantity,
+
+        "put_quantity": put_quantity,
+
+        "entry_time": datetime.now()
     }
 
+    update_state(
 
-# ============================================================
-# EXIT BOTH OPTIONS SIMULTANEOUSLY
-# ============================================================
+        active_trade=True,
 
-def exit_both(ce, pe):
+        trade_number=trade_number,
 
-    print()
-    print("==============================================")
-    print("EXITING CE + PE")
-    print("==============================================")
+        trade_call_symbol=call["symbol"],
 
-    with ThreadPoolExecutor(
-        max_workers=2
-    ) as executor:
+        trade_put_symbol=put["symbol"],
 
-        ce_future = executor.submit(
-            sell_option,
-            ce
-        )
+        call_entry=call_entry,
 
-        pe_future = executor.submit(
-            sell_option,
-            pe
-        )
+        put_entry=put_entry,
 
-        ce_result = ce_future.result()
-        pe_result = pe_future.result()
+        call_current=call_entry,
 
-    return ce_result, pe_result
+        put_current=put_entry,
 
+        call_quantity=call_quantity,
 
-# ============================================================
-# TRADE LOOP
-# ============================================================
+        put_quantity=put_quantity,
 
-def run_trade():
+        combined_pnl=0.0,
 
-    global total_profit
-    global completed_trades
-    global current_trade
-    global last_error
-
-    # --------------------------------------------------------
-    # Get option chain
-    # --------------------------------------------------------
-
-    chain = get_option_chain()
-
-    if chain is None:
-
-        return False
-
-    ce, pe = find_otm_options(chain)
-
-    if ce is None or pe is None:
-
-        return False
-
-    print()
-    print("SELECTED CE:")
-    print(ce)
-
-    print()
-    print("SELECTED PE:")
-    print(pe)
-
-    # --------------------------------------------------------
-    # Enter both
-    # --------------------------------------------------------
-
-    entry = enter_both(
-        ce,
-        pe
+        trigger_side="CALL + PUT"
     )
 
-    if entry is None:
-
-        return False
-
-    ce_entry = entry["ce_entry"]
-    pe_entry = entry["pe_entry"]
-
-    with state_lock:
-
-        current_trade = {
-            "ce_symbol": ce["symbol"],
-            "pe_symbol": pe["symbol"],
-            "ce_entry": ce_entry,
-            "pe_entry": pe_entry,
-            "combined_profit": 0.0
-        }
-
-    print()
-    print(
-        "CE ENTRY:",
-        ce_entry
+    log(
+        f"Trade #{trade_number} ENTERED | "
+        f"CALL={call['symbol']} @ ₹{call_entry:.2f} | "
+        f"PUT={put['symbol']} @ ₹{put_entry:.2f}"
     )
-
-    print(
-        "PE ENTRY:",
-        pe_entry
-    )
-
-    # --------------------------------------------------------
-    # Monitor combined P&L
-    # --------------------------------------------------------
-
-    while bot_running:
-
-        if force_exit_time_reached():
-
-            print(
-                "FORCE EXIT TIME REACHED."
-            )
-
-            break
-
-        ce_ltp = get_ltp(ce)
-        pe_ltp = get_ltp(pe)
-
-        if ce_ltp is None or pe_ltp is None:
-
-            time.sleep(
-                CHAIN_REFRESH_SECONDS
-            )
-
-            continue
-
-        # ----------------------------------------------------
-        # Since both legs were BUY positions:
-        #
-        # profit = (current - entry) * quantity
-        # ----------------------------------------------------
-
-        ce_profit = (
-            ce_ltp - ce_entry
-        ) * LOT_SIZE
-
-        pe_profit = (
-            pe_ltp - pe_entry
-        ) * LOT_SIZE
-
-        combined_profit = (
-            ce_profit + pe_profit
-        )
-
-        with state_lock:
-
-            if current_trade is not None:
-
-                current_trade[
-                    "ce_ltp"
-                ] = ce_ltp
-
-                current_trade[
-                    "pe_ltp"
-                ] = pe_ltp
-
-                current_trade[
-                    "combined_profit"
-                ] = round(
-                    combined_profit,
-                    2
-                )
-
-        print(
-            "CE:",
-            round(ce_ltp, 2),
-            "| PE:",
-            round(pe_ltp, 2),
-            "| Combined P&L:",
-            round(combined_profit, 2)
-        )
-
-        # ----------------------------------------------------
-        # TARGET
-        # ----------------------------------------------------
-
-        if combined_profit >= TARGET_PROFIT:
-
-            print(
-                "TARGET PROFIT REACHED:",
-                combined_profit
-            )
-
-            break
-
-        # ----------------------------------------------------
-        # STOP LOSS
-        # ----------------------------------------------------
-
-        if combined_profit <= STOP_LOSS:
-
-            print(
-                "STOP LOSS REACHED:",
-                combined_profit
-            )
-
-            break
-
-        time.sleep(
-            CHAIN_REFRESH_SECONDS
-        )
-
-    # --------------------------------------------------------
-    # EXIT BOTH
-    # --------------------------------------------------------
-
-    ce_result, pe_result = exit_both(
-        ce,
-        pe
-    )
-
-    ce_exit = ce_result.get(
-        "price",
-        ce_ltp
-    )
-
-    pe_exit = pe_result.get(
-        "price",
-        pe_ltp
-    )
-
-    ce_exit = float(ce_exit)
-    pe_exit = float(pe_exit)
-
-    # --------------------------------------------------------
-    # Final realized estimate
-    # --------------------------------------------------------
-
-    ce_final_profit = (
-        ce_exit - ce_entry
-    ) * LOT_SIZE
-
-    pe_final_profit = (
-        pe_exit - pe_entry
-    ) * LOT_SIZE
-
-    trade_profit = (
-        ce_final_profit +
-        pe_final_profit
-    )
-
-    total_profit += trade_profit
-
-    completed_trades += 1
-
-    trade_number = completed_trades
-
-    log_trade(
-        trade_number,
-        ce["symbol"],
-        pe["symbol"],
-        ce_entry,
-        pe_entry,
-        ce_exit,
-        pe_exit,
-        trade_profit,
-        total_profit
-    )
-
-    print()
-    print("==============================================")
-    print("TRADE COMPLETED")
-    print("Trade:", trade_number)
-    print("Profit:", round(trade_profit, 2))
-    print("Total:", round(total_profit, 2))
-    print("==============================================")
-
-    with state_lock:
-
-        current_trade = None
-
-    # --------------------------------------------------------
-    # Check total target
-    # --------------------------------------------------------
-
-    if total_profit >= TOTAL_PROFIT_TARGET:
-
-        print()
-        print(
-            "TOTAL PROFIT TARGET REACHED."
-        )
-
-        return True
 
     return True
 
 
 # ============================================================
-# MAIN BOT WORKER
+# EXIT ACTIVE PAIR
 # ============================================================
 
-def bot_worker():
-    
-    global bot_running
-    global last_error
-    global current_trade
+def exit_pair(reason):
 
-    print()
-    print("==============================================")
-    print("SENSEX OPTION BOT STARTED")
-    print("==============================================")
+    global active_trade
+
+    if active_trade is None:
+
+        return False
+
+    trade = active_trade
+
+    log(
+        "=============================================="
+    )
+
+    log(
+        f"EXITING TRADE #{trade['trade_number']}"
+    )
+
+    log(
+        f"Reason: {reason}"
+    )
+
+    # ========================================================
+    # SELL BOTH AS CLOSE TO SIMULTANEOUS AS POSSIBLE
+    # ========================================================
+
+    with ThreadPoolExecutor(
+        max_workers=2
+    ) as executor:
+
+        call_future = executor.submit(
+            place_market_order,
+            trade["call"],
+            trade["call_quantity"],
+            "S"
+        )
+
+        put_future = executor.submit(
+            place_market_order,
+            trade["put"],
+            trade["put_quantity"],
+            "S"
+        )
+
+        call_order = call_future.result()
+
+        put_order = put_future.result()
+
+    if not call_order:
+
+        log(
+            "WARNING: CALL exit order failed."
+        )
+
+    if not put_order:
+
+        log(
+            "WARNING: PUT exit order failed."
+        )
+
+    # ========================================================
+    # GET EXIT PRICES
+    # ========================================================
+
+    call_exit = get_current_ltp(
+        trade["call"]["neoSymbol"]
+    )
+
+    time.sleep(
+        REST_DELAY
+    )
+
+    put_exit = get_current_ltp(
+        trade["put"]["neoSymbol"]
+    )
+
+    # --------------------------------------------------------
+    # FALLBACK
+    # --------------------------------------------------------
+
+    if call_exit <= 0:
+
+        call_exit = trade[
+            "call_current"
+        ]
+
+    if put_exit <= 0:
+
+        put_exit = trade[
+            "put_current"
+        ]
+
+    # ========================================================
+    # FINAL P&L
+    # ========================================================
+
+    call_profit = (
+        call_exit
+        - trade["call_entry"]
+    ) * trade["call_quantity"]
+
+    put_profit = (
+        put_exit
+        - trade["put_entry"]
+    ) * trade["put_quantity"]
+
+    combined_profit = (
+        call_profit
+        + put_profit
+    )
+
+    # ========================================================
+    # UPDATE TOTAL PROFIT
+    # ========================================================
+
+    with state_lock:
+
+        bot_state["completed_trades"] += 1
+
+        bot_state["last_trade_profit"] = (
+            round(
+                combined_profit,
+                2
+            )
+        )
+
+        bot_state["total_profit"] += (
+            combined_profit
+        )
+
+        bot_state["last_trade_time"] = (
+            datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        )
+
+        bot_state["combined_pnl"] = (
+            round(
+                combined_profit,
+                2
+            )
+        )
+
+        total_profit = (
+            bot_state["total_profit"]
+        )
+
+    # ========================================================
+    # LOG TRADE
+    # ========================================================
+
+    log_trade(
+        trade_number=trade[
+            "trade_number"
+        ],
+
+        call_symbol=trade[
+            "call"
+        ]["symbol"],
+
+        put_symbol=trade[
+            "put"
+        ]["symbol"],
+
+        call_entry=trade[
+            "call_entry"
+        ],
+
+        put_entry=trade[
+            "put_entry"
+        ],
+
+        call_exit=call_exit,
+
+        put_exit=put_exit,
+
+        call_quantity=trade[
+            "call_quantity"
+        ],
+
+        put_quantity=trade[
+            "put_quantity"
+        ],
+
+        combined_profit=combined_profit
+    )
+
+    log(
+        f"Trade #{trade['trade_number']} CLOSED | "
+        f"CALL EXIT=₹{call_exit:.2f} | "
+        f"PUT EXIT=₹{put_exit:.2f} | "
+        f"Trade P&L=₹{combined_profit:.2f} | "
+        f"Total=₹{total_profit:.2f}"
+    )
+
+    # ========================================================
+    # CLEAR ACTIVE TRADE
+    # ========================================================
+
+    active_trade = None
+
+    update_state(
+
+        active_trade=False,
+
+        trade_call_symbol="",
+
+        trade_put_symbol="",
+
+        call_entry=0.0,
+
+        put_entry=0.0,
+
+        call_current=0.0,
+
+        put_current=0.0,
+
+        call_quantity=0,
+
+        put_quantity=0,
+
+        combined_pnl=0.0,
+
+        trigger_side=""
+    )
+
+    return True
+
+
+# ============================================================
+# FORCE EXIT
+# ============================================================
+
+def force_exit():
+
+    if active_trade is not None:
+
+        exit_pair(
+            "Force exit time"
+        )
+
+
+# ============================================================
+# RESET OPTION DISPLAY
+# ============================================================
+
+def clear_option_display():
+
+    update_state(
+
+        call_target_strike=0.0,
+
+        call_strike=0.0,
+
+        call_symbol="",
+
+        call_ltp=0.0,
+
+        put_target_strike=0.0,
+
+        put_strike=0.0,
+
+        put_symbol="",
+
+        put_ltp=0.0
+    )
+
+
+# ============================================================
+# LOG TRADE TO CSV
+# ============================================================
+
+def log_trade(
+    trade_number,
+    call_symbol,
+    put_symbol,
+    call_entry,
+    put_entry,
+    call_exit,
+    put_exit,
+    call_quantity,
+    put_quantity,
+    combined_profit
+):
+
+    file_exists = os.path.exists(
+        TRADE_LOG_FILE
+    )
 
     try:
 
-        if not login():
+        with open(
+            TRADE_LOG_FILE,
+            "a",
+            newline="",
+            encoding="utf-8"
+        ) as file:
+
+            writer = csv.writer(file)
+
+            if not file_exists:
+
+                writer.writerow([
+                    "trade_number",
+                    "date",
+                    "time",
+                    "call_symbol",
+                    "put_symbol",
+                    "call_entry",
+                    "put_entry",
+                    "call_exit",
+                    "put_exit",
+                    "call_quantity",
+                    "put_quantity",
+                    "combined_profit",
+                    "cumulative_profit"
+                ])
+
+            now = datetime.now()
+
+            with state_lock:
+
+                cumulative_profit = (
+                    bot_state[
+                        "total_profit"
+                    ]
+                )
+
+            writer.writerow([
+
+                trade_number,
+
+                now.strftime(
+                    "%Y-%m-%d"
+                ),
+
+                now.strftime(
+                    "%H:%M:%S"
+                ),
+
+                call_symbol,
+
+                put_symbol,
+
+                round(
+                    call_entry,
+                    2
+                ),
+
+                round(
+                    put_entry,
+                    2
+                ),
+
+                round(
+                    call_exit,
+                    2
+                ),
+
+                round(
+                    put_exit,
+                    2
+                ),
+
+                call_quantity,
+
+                put_quantity,
+
+                round(
+                    combined_profit,
+                    2
+                ),
+
+                round(
+                    cumulative_profit,
+                    2
+                )
+            ])
+
+    except Exception as e:
+
+        log(
+            f"Trade log error: {e}"
+        )
+
+
+# ============================================================
+# BOT WORKER
+# ============================================================
+
+def bot_worker():
+
+    global bot_running
+
+    log(
+        "=============================================="
+    )
+
+    log(
+        "SENSEX OPTION BOT WORKER STARTED"
+    )
+
+    log(
+        f"Mode: "
+        f"{'LIVE' if LIVE_TRADING else 'PAPER'}"
+    )
+
+    log(
+        f"Target premium: ₹{TARGET_OPTION_PREMIUM}"
+    )
+
+    log(
+        f"Pair target: ₹{TARGET_PROFIT}"
+    )
+
+    log(
+        f"Stop loss: ₹{STOP_LOSS}"
+    )
+
+    log(
+        f"Total target: ₹{TOTAL_PROFIT_TARGET}"
+    )
+
+    # ========================================================
+    # LOGIN
+    # ========================================================
+
+    if not login():
+
+        with state_lock:
 
             bot_running = False
 
-            return
+            bot_state["running"] = False
 
-        while bot_running:
+            bot_state["status"] = (
+                "Login failed"
+            )
 
-            # ------------------------------------------------
-            # Stop after total target
-            # ------------------------------------------------
+        return
 
-            if total_profit >= TOTAL_PROFIT_TARGET:
+    update_state(
 
-                print(
-                    "₹1000 TOTAL PROFIT TARGET REACHED."
+        status="Running",
+
+        message="Bot is running.",
+
+        running=True
+    )
+
+    log(
+        "Bot is now RUNNING."
+    )
+
+    # ========================================================
+    # MAIN LOOP
+    # ========================================================
+
+    while bot_running:
+
+        try:
+
+            now = datetime.now().time()
+
+            # =================================================
+            # FORCE EXIT
+            # =================================================
+
+            if now >= FORCE_EXIT_TIME:
+
+                if active_trade is not None:
+
+                    force_exit()
+
+                log(
+                    "Force exit time reached."
                 )
 
                 break
 
-            # ------------------------------------------------
-            # Do not enter after 15:00
-            # ------------------------------------------------
+            # =================================================
+            # CUMULATIVE TARGET
+            # =================================================
 
-            if not before_entry_cutoff():
+            with state_lock:
 
-                print(
-                    "Entry time finished. Waiting for exit time."
+                total_profit = (
+                    bot_state[
+                        "total_profit"
+                    ]
                 )
 
-                if force_exit_time_reached():
+            if (
+                total_profit
+                >= TOTAL_PROFIT_TARGET
+            ):
 
-                    break
+                if active_trade is not None:
 
-                time.sleep(30)
+                    exit_pair(
+                        "Cumulative profit target"
+                    )
+
+                log(
+                    "₹1000 cumulative profit "
+                    "target reached."
+                )
+
+                update_state(
+
+                    status="Target reached",
+
+                    message=(
+                        "Cumulative profit "
+                        "target reached."
+                    )
+                )
+
+                break
+
+            # =================================================
+            # ACTIVE TRADE
+            # =================================================
+
+            if active_trade is not None:
+
+                combined_pnl = (
+                    calculate_combined_pnl()
+                )
+
+                if combined_pnl is not None:
+
+                    log(
+                        f"Trade #"
+                        f"{active_trade['trade_number']} "
+                        f"P&L = "
+                        f"₹{combined_pnl:.2f}"
+                    )
+
+                    # -----------------------------------------
+                    # TARGET
+                    # -----------------------------------------
+
+                    if (
+                        combined_pnl
+                        >= TARGET_PROFIT
+                    ):
+
+                        exit_pair(
+                            "Combined profit target"
+                        )
+
+                        time.sleep(
+                            REST_DELAY
+                        )
+
+                        continue
+
+                    # -----------------------------------------
+                    # STOP LOSS
+                    # -----------------------------------------
+
+                    if (
+                        combined_pnl
+                        <= STOP_LOSS
+                    ):
+
+                        exit_pair(
+                            "Combined stop loss"
+                        )
+
+                        time.sleep(
+                            REST_DELAY
+                        )
+
+                        continue
+
+                time.sleep(
+                    CHAIN_REFRESH_SECONDS
+                )
 
                 continue
 
-            # ------------------------------------------------
-            # One trade at a time
-            # ------------------------------------------------
+            # =================================================
+            # NO ACTIVE TRADE
+            # =================================================
 
-            if current_trade is not None:
+            # -------------------------------------------------
+            # NO ENTRY AFTER 15:00
+            # -------------------------------------------------
 
-                time.sleep(1)
+            if now >= LAST_ENTRY_TIME:
+
+                log(
+                    "Last entry time reached. "
+                    "No new trades."
+                )
+
+                time.sleep(
+                    CHAIN_REFRESH_SECONDS
+                )
 
                 continue
 
-            try:
+            # =================================================
+            # GET EXPIRY
+            # =================================================
 
-                run_trade()
+            expiry = (
+                get_nearest_expiry()
+            )
 
-            except Exception as e:
+            if not expiry:
 
-                last_error = str(e)
-
-                print(
-                    "TRADE ERROR:",
-                    e
+                log(
+                    "Unable to get expiry."
                 )
 
-                time.sleep(5)
+                time.sleep(
+                    CHAIN_REFRESH_SECONDS
+                )
 
-    except Exception as e:
+                continue
 
-        last_error = str(e)
+            update_state(
+                expiry=expiry
+            )
 
-        print(
-            "BOT WORKER ERROR:",
-            e
-        )
+            # =================================================
+            # GET OPTION CHAIN
+            # =================================================
 
-    finally:
+            chain_data = (
+                get_option_chain(
+                    expiry
+                )
+            )
+
+            if not chain_data:
+
+                log(
+                    "Unable to get option chain."
+                )
+
+                time.sleep(
+                    CHAIN_REFRESH_SECONDS
+                )
+
+                continue
+
+            # =================================================
+            # GET SPOT
+            # =================================================
+
+            spot = (
+                get_sensex_spot(
+                    chain_data
+                )
+            )
+
+            if spot <= 0:
+
+                log(
+                    "Invalid SENSEX spot."
+                )
+
+                time.sleep(
+                    CHAIN_REFRESH_SECONDS
+                )
+
+                continue
+
+            update_state(
+                spot=spot
+            )
+
+            # =================================================
+            # PARSE OPTIONS
+            # =================================================
+
+            calls, puts = (
+                parse_option_chain(
+                    chain_data
+                )
+            )
+
+            if not calls or not puts:
+
+                log(
+                    "CALL or PUT data unavailable."
+                )
+
+                time.sleep(
+                    CHAIN_REFRESH_SECONDS
+                )
+
+                continue
+
+            # =================================================
+            # FIND ₹10 OTM CALL
+            # =================================================
+
+            call = (
+                find_otm_closest_to_premium(
+                    calls,
+                    spot,
+                    "CE",
+                    TARGET_OPTION_PREMIUM
+                )
+            )
+
+            # =================================================
+            # FIND ₹10 OTM PUT
+            # =================================================
+
+            put = (
+                find_otm_closest_to_premium(
+                    puts,
+                    spot,
+                    "PE",
+                    TARGET_OPTION_PREMIUM
+                )
+            )
+
+            if not call or not put:
+
+                log(
+                    "Unable to find suitable "
+                    "OTM CALL and PUT."
+                )
+
+                time.sleep(
+                    CHAIN_REFRESH_SECONDS
+                )
+
+                continue
+
+            # =================================================
+            # UPDATE DASHBOARD
+            # =================================================
+
+            update_state(
+
+                call_target_strike=call[
+                    "strike"
+                ],
+
+                call_strike=call[
+                    "strike"
+                ],
+
+                call_symbol=call[
+                    "symbol"
+                ],
+
+                call_ltp=call[
+                    "ltp"
+                ],
+
+                put_target_strike=put[
+                    "strike"
+                ],
+
+                put_strike=put[
+                    "strike"
+                ],
+
+                put_symbol=put[
+                    "symbol"
+                ],
+
+                put_ltp=put[
+                    "ltp"
+                ]
+            )
+
+            log(
+                f"₹10 candidates | "
+                f"CALL {call['symbol']} "
+                f"₹{call['ltp']:.2f} | "
+                f"PUT {put['symbol']} "
+                f"₹{put['ltp']:.2f} | "
+                f"SPOT {spot:.2f}"
+            )
+
+            # =================================================
+            # ENTER PAIR
+            # =================================================
+
+            enter_pair(
+                call,
+                put
+            )
+
+            time.sleep(
+                CHAIN_REFRESH_SECONDS
+            )
+
+        except Exception as e:
+
+            error_message = (
+                f"{type(e).__name__}: {e}"
+            )
+
+            log(
+                f"BOT LOOP ERROR: "
+                f"{error_message}"
+            )
+
+            print(
+                traceback.format_exc()
+            )
+
+            update_state(
+                last_error=error_message
+            )
+
+            time.sleep(
+                CHAIN_REFRESH_SECONDS
+            )
+
+    # ========================================================
+    # FINAL CLEANUP
+    # ========================================================
+
+    with state_lock:
 
         bot_running = False
 
-        with state_lock:
+        bot_state["running"] = False
 
-            current_trade = None
+        if (
+            bot_state["status"]
+            != "Target reached"
+        ):
 
-        print()
-        print(
-            "BOT STOPPED."
-        )
+            bot_state["status"] = (
+                "Stopped"
+            )
+
+    log(
+        "Bot worker stopped."
+    )
 
 
 # ============================================================
@@ -1230,25 +2248,36 @@ def start_bot():
 
     global bot_running
     global bot_thread
-    global total_profit
-    global completed_trades
-    global last_error
 
     with state_lock:
 
         if bot_running:
 
             return {
-                "status": "already_running",
-                "message": "Bot is already running."
+                "success": False,
+                "message":
+                    "Bot is already running."
             }
 
-        total_profit = 0.0
-        completed_trades = 0
-
-        last_error = None
-
         bot_running = True
+
+        bot_state["running"] = True
+
+        bot_state["status"] = (
+            "Starting"
+        )
+
+        bot_state["message"] = (
+            "Bot is starting..."
+        )
+
+        bot_state["last_error"] = ""
+
+        bot_state["last_update"] = (
+            datetime.now().strftime(
+                "%H:%M:%S"
+            )
+        )
 
     bot_thread = threading.Thread(
         target=bot_worker,
@@ -1257,9 +2286,14 @@ def start_bot():
 
     bot_thread.start()
 
+    log(
+        "Bot start command accepted."
+    )
+
     return {
-        "status": "started",
-        "message": "Bot started."
+        "success": True,
+        "message":
+            "Bot started successfully."
     }
 
 
@@ -1276,13 +2310,109 @@ def stop_bot():
         if not bot_running:
 
             return {
-                "status": "already_stopped",
-                "message": "Bot is already stopped."
+                "success": False,
+                "message":
+                    "Bot is already stopped."
             }
 
         bot_running = False
 
+        bot_state["running"] = False
+
+        bot_state["status"] = (
+            "Stopping"
+        )
+
+        bot_state["message"] = (
+            "Bot is stopping..."
+        )
+
+    # ========================================================
+    # CLOSE ACTIVE TRADE
+    # ========================================================
+
+    try:
+
+        if active_trade is not None:
+
+            exit_pair(
+                "Manual bot stop"
+            )
+
+    except Exception as e:
+
+        log(
+            f"Error closing active trade: {e}"
+        )
+
+    log(
+        "Bot stop command accepted."
+    )
+
     return {
-        "status": "stopping",
-        "message": "Stop signal sent to bot."
+        "success": True,
+        "message":
+            "Bot stopped successfully."
     }
+
+
+# ============================================================
+# DIRECT RUN
+# ============================================================
+
+if __name__ == "__main__":
+
+    print()
+    print("=" * 60)
+    print("              SENSEX OPTION BOT")
+    print("=" * 60)
+    print()
+
+    print(
+        f"Mode: "
+        f"{'LIVE' if LIVE_TRADING else 'PAPER'}"
+    )
+
+    print(
+        f"Target premium: "
+        f"₹{TARGET_OPTION_PREMIUM}"
+    )
+
+    print(
+        f"Pair profit target: "
+        f"₹{TARGET_PROFIT}"
+    )
+
+    print(
+        f"Stop loss: "
+        f"₹{STOP_LOSS}"
+    )
+
+    print(
+        f"Total profit target: "
+        f"₹{TOTAL_PROFIT_TARGET}"
+    )
+
+    print(
+        f"Lot size: "
+        f"{LOT_SIZE}"
+    )
+
+    print()
+
+    start_bot()
+
+    try:
+
+        while bot_running:
+
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+
+        print()
+        print(
+            "Stopping bot..."
+        )
+
+        stop_bot()
