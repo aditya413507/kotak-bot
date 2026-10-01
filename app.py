@@ -1,4 +1,3 @@
-```python
 from flask import Flask, jsonify, render_template
 import importlib.util
 import os
@@ -284,4 +283,3 @@ if __name__ == "__main__":
         debug=False,
         threaded=True
     )
-```
