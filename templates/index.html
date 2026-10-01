@@ -1,1124 +1,637 @@
+```html
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
-<meta charset="UTF-8">
-
-<meta name="viewport"
-   content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-<title>SENSEX Bot</title>
-
-<style>
-
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    -webkit-tap-highlight-color: transparent;
-}
-
-body {
-
-    background: #070b12;
-
-    color: #ffffff;
-
-    min-height: 100vh;
-
-    overflow-x: hidden;
-
-}
-
-
-/* ================= HEADER ================= */
-
-.header {
-
-    height: 64px;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    padding: 0 18px;
-
-    background: #0c111b;
-
-    border-bottom: 1px solid #1c2635;
-
-    position: sticky;
-
-    top: 0;
-
-    z-index: 100;
-
-}
-
-.brand {
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 10px;
-
-}
-
-.logo {
-
-    width: 38px;
-
-    height: 38px;
-
-    border-radius: 10px;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    background: #2563eb;
-
-    font-size: 19px;
-
-}
-
-.brand h2 {
-
-    font-size: 15px;
-
-    font-weight: 700;
-
-}
-
-.brand p {
-
-    font-size: 10px;
-
-    color: #718096;
-
-    margin-top: 2px;
-
-}
-
-.market {
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 6px;
-
-    font-size: 10px;
-
-    color: #94a3b8;
-
-}
-
-.market-dot {
-
-    width: 7px;
-
-    height: 7px;
-
-    border-radius: 50%;
-
-    background: #22c55e;
-
-}
-
-
-/* ================= PAGE ================= */
-
-.container {
-
-    width: 100%;
-
-    max-width: 520px;
-
-    margin: auto;
-
-    padding: 20px 15px 40px;
-
-}
-
-
-/* ================= WELCOME ================= */
-
-.welcome {
-
-    margin-bottom: 16px;
-
-}
-
-.welcome h1 {
-
-    font-size: 25px;
-
-    font-weight: 700;
-
-}
-
-.welcome p {
-
-    margin-top: 5px;
-
-    color: #718096;
-
-    font-size: 12px;
-
-}
-
-
-/* ================= BOT STATUS ================= */
-
-.status-card {
-
-    background: #101722;
-
-    border: 1px solid #202b3b;
-
-    border-radius: 18px;
-
-    padding: 20px;
-
-    margin-bottom: 14px;
-
-}
-
-.status-top {
-
-    display: flex;
-
-    justify-content: space-between;
-
-    align-items: center;
-
-}
-
-.status-label {
-
-    color: #718096;
-
-    font-size: 10px;
-
-    font-weight: 700;
-
-    letter-spacing: 1px;
-
-}
-
-.status-badge {
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 7px;
-
-    padding: 6px 10px;
-
-    border-radius: 20px;
-
-    background: #1f1720;
-
-    color: #ef4444;
-
-    font-size: 10px;
-
-    font-weight: 700;
-
-}
-
-.status-badge.running {
-
-    background: #0d2519;
-
-    color: #22c55e;
-
-}
-
-.status-dot {
-
-    width: 7px;
-
-    height: 7px;
-
-    border-radius: 50%;
-
-    background: #ef4444;
-
-}
-
-.status-badge.running .status-dot {
-
-    background: #22c55e;
-
-    box-shadow: 0 0 8px #22c55e;
-
-}
-
-.status-main {
-
-    margin-top: 18px;
-
-}
-
-.status-main h2 {
-
-    font-size: 25px;
-
-}
-
-.status-main p {
-
-    color: #64748b;
-
-    font-size: 11px;
-
-    margin-top: 5px;
-
-}
-
-
-/* ================= PROFIT ================= */
-
-.profit-card {
-
-    background: linear-gradient(
-        145deg,
-        #0f2419,
-        #0c1713
-    );
-
-    border: 1px solid #1c4d32;
-
-    border-radius: 18px;
-
-    padding: 22px;
-
-    margin-bottom: 14px;
-
-}
-
-.profit-label {
-
-    color: #86a895;
-
-    font-size: 10px;
-
-    font-weight: 700;
-
-    letter-spacing: 1px;
-
-}
-
-.profit {
-
-    font-size: 36px;
-
-    font-weight: 800;
-
-    color: #22c55e;
-
-    margin-top: 8px;
-
-    letter-spacing: -1px;
-
-}
-
-.profit-sub {
-
-    color: #64806e;
-
-    font-size: 10px;
-
-    margin-top: 5px;
-
-}
-
-
-/* ================= STATISTICS ================= */
-
-.stats {
-
-    display: grid;
-
-    grid-template-columns: 1fr 1fr;
-
-    gap: 12px;
-
-    margin-bottom: 14px;
-
-}
-
-.stat {
-
-    background: #101722;
-
-    border: 1px solid #202b3b;
-
-    border-radius: 16px;
-
-    padding: 18px;
-
-    min-height: 105px;
-
-}
-
-.stat-icon {
-
-    font-size: 17px;
-
-    margin-bottom: 12px;
-
-}
-
-.stat-label {
-
-    color: #718096;
-
-    font-size: 10px;
-
-}
-
-.stat-value {
-
-    margin-top: 5px;
-
-    font-size: 21px;
-
-    font-weight: 700;
-
-    word-break: break-word;
-
-}
-
-
-/* ================= CURRENT TRADE ================= */
-
-.trade-card {
-
-    background: #101722;
-
-    border: 1px solid #202b3b;
-
-    border-radius: 18px;
-
-    padding: 18px;
-
-    margin-bottom: 14px;
-
-}
-
-.trade-header {
-
-    display: flex;
-
-    justify-content: space-between;
-
-    align-items: center;
-
-    margin-bottom: 15px;
-
-}
-
-.trade-header h3 {
-
-    font-size: 14px;
-
-}
-
-.trade-header span {
-
-    color: #64748b;
-
-    font-size: 10px;
-
-}
-
-.trade-content {
-
-    background: #080d15;
-
-    border-radius: 12px;
-
-    padding: 15px;
-
-    color: #94a3b8;
-
-    font-size: 12px;
-
-    min-height: 48px;
-
-    display: flex;
-
-    align-items: center;
-
-}
-
-
-/* ================= CONTROLS ================= */
-
-.control-card {
-
-    background: #101722;
-
-    border: 1px solid #202b3b;
-
-    border-radius: 18px;
-
-    padding: 18px;
-
-    margin-bottom: 14px;
-
-}
-
-.control-card h3 {
-
-    font-size: 14px;
-
-    margin-bottom: 4px;
-
-}
-
-.control-card p {
-
-    color: #64748b;
-
-    font-size: 10px;
-
-    margin-bottom: 16px;
-
-}
-
-.button {
-
-    width: 100%;
-
-    height: 52px;
-
-    border: none;
-
-    border-radius: 13px;
-
-    font-size: 14px;
-
-    font-weight: 700;
-
-    color: white;
-
-    margin-bottom: 10px;
-
-    cursor: pointer;
-
-}
-
-.start {
-
-    background: #16a34a;
-
-}
-
-.stop {
-
-    background: #dc2626;
-
-    margin-bottom: 0;
-
-}
-
-.button:active {
-
-    transform: scale(0.98);
-
-}
-
-.button:disabled {
-
-    opacity: 0.45;
-
-}
-
-
-/* ================= MESSAGE ================= */
-
-.message {
-
-    text-align: center;
-
-    min-height: 18px;
-
-    margin-top: 12px;
-
-    font-size: 10px;
-
-    color: #64748b;
-
-}
-
-
-/* ================= CONFIGURATION ================= */
-
-.config {
-
-    background: #101722;
-
-    border: 1px solid #202b3b;
-
-    border-radius: 18px;
-
-    overflow: hidden;
-
-    margin-bottom: 20px;
-
-}
-
-.config-title {
-
-    padding: 18px;
-
-    border-bottom: 1px solid #202b3b;
-
-}
-
-.config-title h3 {
-
-    font-size: 14px;
-
-}
-
-.config-title p {
-
-    font-size: 10px;
-
-    color: #64748b;
-
-    margin-top: 4px;
-
-}
-
-.config-row {
-
-    display: flex;
-
-    justify-content: space-between;
-
-    align-items: center;
-
-    padding: 15px 18px;
-
-    border-bottom: 1px solid #192331;
-
-}
-
-.config-row:last-child {
-
-    border-bottom: none;
-
-}
-
-.config-row span {
-
-    color: #718096;
-
-    font-size: 11px;
-
-}
-
-.config-row strong {
-
-    font-size: 12px;
-
-}
-
-
-/* ================= FOOTER ================= */
-
-.footer {
-
-    text-align: center;
-
-    color: #374151;
-
-    font-size: 9px;
-
-    padding-bottom: 15px;
-
-}
-
-
-/* ================= TABLET / DESKTOP ================= */
-
-@media (min-width: 700px) {
-
-    .container {
-
-        max-width: 700px;
-
-        padding-top: 35px;
-
-    }
-
-    .stats {
-
-        grid-template-columns: repeat(2, 1fr);
-
-    }
-
-}
-
-
-/* ================= SMALL PHONES ================= */
-
-@media (max-width: 360px) {
-
-    .container {
-
-        padding-left: 12px;
-
-        padding-right: 12px;
-
-    }
-
-    .welcome h1 {
-
-        font-size: 22px;
-
-    }
-
-    .profit {
-
-        font-size: 32px;
-
-    }
-
-}
-
-</style>
-
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Kotak Bot</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background: #0b0f14;
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 600px;
+            margin: auto;
+            padding: 14px;
+        }
+
+        /* HEADER */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 2px 18px;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #151b23;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .logo-text h2 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .logo-text p {
+            color: #8d98a7;
+            font-size: 11px;
+            margin-top: 3px;
+        }
+
+        .market {
+            font-size: 11px;
+            color: #8d98a7;
+            text-align: right;
+        }
+
+        .market strong {
+            display: block;
+            color: #ffffff;
+            font-size: 12px;
+            margin-bottom: 3px;
+        }
+
+        /* PAGE TITLE */
+        .page-title {
+            margin-bottom: 14px;
+        }
+
+        .page-title h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .page-title p {
+            color: #8d98a7;
+            font-size: 13px;
+        }
+
+        /* TOP ROW */
+        .top-stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        /* CARDS */
+        .card {
+            background: #121820;
+            border: 1px solid #202936;
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        .card-title {
+            color: #8d98a7;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        /* STATUS */
+        .status-card {
+            min-height: 115px;
+        }
+
+        .status-value {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #777;
+        }
+
+        .status-dot.running {
+            background: #20d47a;
+            box-shadow: 0 0 10px rgba(32, 212, 122, 0.6);
+        }
+
+        .status-dot.stopped {
+            background: #ff5964;
+        }
+
+        .status-text.running {
+            color: #20d47a;
+        }
+
+        .status-text.stopped {
+            color: #ff5964;
+        }
+
+        /* PROFIT */
+        .profit-card {
+            min-height: 115px;
+        }
+
+        .profit-value {
+            font-size: 25px;
+            font-weight: 800;
+            word-break: break-word;
+        }
+
+        .profit-positive {
+            color: #20d47a;
+        }
+
+        .profit-negative {
+            color: #ff5964;
+        }
+
+        /* TWO STATS */
+        .stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .stat-number {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            color: #8d98a7;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+
+        /* CURRENT TRADE */
+        .trade-card {
+            margin-bottom: 12px;
+        }
+
+        .trade-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .trade-header h3 {
+            font-size: 15px;
+        }
+
+        .trade-badge {
+            background: #1b2430;
+            color: #9da9b8;
+            padding: 5px 9px;
+            border-radius: 8px;
+            font-size: 10px;
+        }
+
+        .trade-content {
+            color: #8d98a7;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .trade-content strong {
+            color: #ffffff;
+        }
+
+        .no-trade {
+            color: #697585;
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        /* CONTROLS */
+        .controls-card {
+            margin-bottom: 12px;
+        }
+
+        .controls-card h3 {
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+
+        .button {
+            width: 100%;
+            border: none;
+            border-radius: 13px;
+            padding: 15px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .button:last-child {
+            margin-bottom: 0;
+        }
+
+        .start-btn {
+            background: #20d47a;
+            color: #07130d;
+        }
+
+        .stop-btn {
+            background: #ff5964;
+            color: #ffffff;
+        }
+
+        .button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        /* STRATEGY */
+        .strategy-card {
+            margin-bottom: 12px;
+        }
+
+        .strategy-card h3 {
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+
+        .strategy-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #202936;
+        }
+
+        .strategy-row:last-child {
+            border-bottom: none;
+        }
+
+        .strategy-name {
+            color: #8d98a7;
+            font-size: 12px;
+        }
+
+        .strategy-value {
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        /* FOOTER */
+        .footer {
+            text-align: center;
+            color: #596575;
+            font-size: 10px;
+            padding: 12px 0 6px;
+        }
+
+        /* DESKTOP */
+        @media (min-width: 601px) {
+            .app {
+                max-width: 850px;
+                padding: 24px;
+            }
+
+            .top-stats-row {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        /* SMALL MOBILE */
+        @media (max-width: 360px) {
+            .app {
+                padding: 10px;
+            }
+
+            .card {
+                padding: 13px;
+            }
+
+            .profit-value {
+                font-size: 21px;
+            }
+
+            .status-value {
+                font-size: 17px;
+            }
+
+            .stat-number {
+                font-size: 19px;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<!-- ================= HEADER ================= -->
+<div class="app">
 
-<header class="header">
+    <!-- HEADER -->
+    <div class="header">
 
+        <div class="logo-section">
+            <div class="logo">K</div>
 
-<div class="brand">
-
-    <div class="logo">
-        📈
-    </div>
-
-    <div>
-        <h2>SENSEX BOT</h2>
-        <p>Kotak Neo</p>
-    </div>
-
-</div>
-
-
-<div class="market">
-
-    <div class="market-dot"></div>
-
-    BSE F&O
-
-</div>
-
-
-</header>
-
-<!-- ================= MAIN ================= -->
-
-<main class="container">
-
-
-<!-- WELCOME -->
-
-<div class="welcome">
-
-    <h1>Trading Dashboard</h1>
-
-    <p>
-        Monitor your automated trading system
-    </p>
-
-</div>
-
-
-
-<!-- STATUS -->
-
-<div class="status-card">
-
-    <div class="status-top">
-
-        <div class="status-label">
-            BOT STATUS
+            <div class="logo-text">
+                <h2>Kotak Bot</h2>
+                <p>SENSEX Option Trading</p>
+            </div>
         </div>
 
-        <div id="statusBadge"
-             class="status-badge">
+        <div class="market">
+            <strong>SENSEX</strong>
+            BSE F&O
+        </div>
 
-            <div class="status-dot"></div>
+    </div>
 
-            <span id="statusText">
-                STOPPED
+
+    <!-- PAGE TITLE -->
+    <div class="page-title">
+        <h1>Trading Dashboard</h1>
+        <p>Monitor your automated trading bot</p>
+    </div>
+
+
+    <!-- BOT STATUS + CUMULATIVE PROFIT -->
+    <div class="top-stats-row">
+
+        <!-- BOT STATUS -->
+        <div class="card status-card">
+
+            <div class="card-title">
+                BOT STATUS
+            </div>
+
+            <div class="status-value">
+
+                <span id="statusDot"
+                      class="status-dot stopped"></span>
+
+                <span id="statusText"
+                      class="status-text stopped">
+                    STOPPED
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <!-- CUMULATIVE PROFIT -->
+        <div class="card profit-card">
+
+            <div class="card-title">
+                CUMULATIVE PROFIT
+            </div>
+
+            <div id="profit"
+                 class="profit-value">
+                ₹0.00
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- TRADE STATS -->
+    <div class="stats-row">
+
+        <div class="card">
+
+            <div class="card-title">
+                COMPLETED TRADES
+            </div>
+
+            <div id="trades"
+                 class="stat-number">
+                0
+            </div>
+
+            <div class="stat-label">
+                Finished trades
+            </div>
+
+        </div>
+
+
+        <div class="card">
+
+            <div class="card-title">
+                CURRENT TRADE
+            </div>
+
+            <div id="currentTradeSmall"
+                 class="stat-number">
+                —
+            </div>
+
+            <div class="stat-label">
+                Active position
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- CURRENT TRADE -->
+    <div class="card trade-card">
+
+        <div class="trade-header">
+
+            <h3>Current Trade</h3>
+
+            <div id="tradeBadge"
+                 class="trade-badge">
+                NO ACTIVE TRADE
+            </div>
+
+        </div>
+
+        <div id="tradeContent"
+             class="trade-content">
+
+            <div class="no-trade">
+                No active trade
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- CONTROLS -->
+    <div class="card controls-card">
+
+        <h3>Bot Controls</h3>
+
+        <button id="startBtn"
+                class="button start-btn"
+                onclick="startBot()">
+            START BOT
+        </button>
+
+        <button id="stopBtn"
+                class="button stop-btn"
+                onclick="stopBot()"
+                disabled>
+            STOP BOT
+        </button>
+
+    </div>
+
+
+    <!-- STRATEGY -->
+    <div class="card strategy-card">
+
+        <h3>Strategy Configuration</h3>
+
+        <div class="strategy-row">
+            <span class="strategy-name">
+                Underlying
             </span>
 
+            <span class="strategy-value">
+                SENSEX
+            </span>
+        </div>
+
+        <div class="strategy-row">
+            <span class="strategy-name">
+                Exchange
+            </span>
+
+            <span class="strategy-value">
+                BSE F&O
+            </span>
+        </div>
+
+        <div class="strategy-row">
+            <span class="strategy-name">
+                Target Premium
+            </span>
+
+            <span class="strategy-value">
+                ₹10
+            </span>
+        </div>
+
+        <div class="strategy-row">
+            <span class="strategy-name">
+                Profit Target
+            </span>
+
+            <span class="strategy-value">
+                ₹5
+            </span>
+        </div>
+
+        <div class="strategy-row">
+            <span class="strategy-name">
+                Stop Loss
+            </span>
+
+            <span class="strategy-value">
+                -₹20
+            </span>
+        </div>
+
+        <div class="strategy-row">
+            <span class="strategy-name">
+                Total Target
+            </span>
+
+            <span class="strategy-value">
+                ₹1000
+            </span>
+        </div>
+
+        <div class="strategy-row">
+            <span class="strategy-name">
+                Lot Size
+            </span>
+
+            <span class="strategy-value">
+                20
+            </span>
+        </div>
+
+        <div class="strategy-row">
+            <span class="strategy-name">
+                Entry Time
+            </span>
+
+            <span class="strategy-value">
+                09:15 - 15:00
+            </span>
         </div>
 
     </div>
 
 
-    <div class="status-main">
-
-        <h2 id="statusTitle">
-            Bot is stopped
-        </h2>
-
-        <p id="statusDescription">
-            Start the bot to begin monitoring the market.
-        </p>
-
+    <!-- FOOTER -->
+    <div class="footer">
+        Kotak Bot • SENSEX Automated Trading
     </div>
 
 </div>
 
-
-
-<!-- PROFIT -->
-
-<div class="profit-card">
-
-    <div class="profit-label">
-        CUMULATIVE PROFIT
-    </div>
-
-    <div id="profit"
-         class="profit">
-
-        ₹0.00
-
-    </div>
-
-    <div class="profit-sub">
-        Total realized profit from completed trades
-    </div>
-
-</div>
-
-
-
-<!-- STATISTICS -->
-
-<div class="stats">
-
-
-    <div class="stat">
-
-        <div class="stat-icon">
-            📊
-        </div>
-
-        <div class="stat-label">
-            COMPLETED TRADES
-        </div>
-
-        <div id="trades"
-             class="stat-value">
-
-            0
-
-        </div>
-
-    </div>
-
-
-    <div class="stat">
-
-        <div class="stat-icon">
-            ⚡
-        </div>
-
-        <div class="stat-label">
-            CURRENT TRADE
-        </div>
-
-        <div id="currentTrade"
-             class="stat-value">
-
-            None
-
-        </div>
-
-    </div>
-
-
-</div>
-
-
-
-<!-- CURRENT TRADE -->
-
-<div class="trade-card">
-
-    <div class="trade-header">
-
-        <h3>Current Trade</h3>
-
-        <span>
-            LIVE
-        </span>
-
-    </div>
-
-
-    <div id="tradeDetails"
-         class="trade-content">
-
-        No active trade
-
-    </div>
-
-</div>
-
-
-
-<!-- CONTROLS -->
-
-<div class="control-card">
-
-    <h3>Bot Controls</h3>
-
-    <p>
-        Control automated trading from your phone
-    </p>
-
-
-    <button
-        id="startBtn"
-        class="button start"
-        onclick="startBot()">
-
-        ▶ &nbsp; START BOT
-
-    </button>
-
-
-    <button
-        id="stopBtn"
-        class="button stop"
-        onclick="stopBot()">
-
-        ■ &nbsp; STOP BOT
-
-    </button>
-
-
-    <div id="message"
-         class="message">
-
-        Ready
-
-    </div>
-
-</div>
-
-
-
-<!-- CONFIGURATION -->
-
-<div class="config">
-
-
-    <div class="config-title">
-
-        <h3>
-            Strategy Configuration
-        </h3>
-
-        <p>
-            Current bot parameters
-        </p>
-
-    </div>
-
-
-    <div class="config-row">
-
-        <span>Underlying</span>
-
-        <strong>SENSEX</strong>
-
-    </div>
-
-
-    <div class="config-row">
-
-        <span>Exchange</span>
-
-        <strong>BSE F&O</strong>
-
-    </div>
-
-
-    <div class="config-row">
-
-        <span>Target Premium</span>
-
-        <strong>₹10</strong>
-
-    </div>
-
-
-    <div class="config-row">
-
-        <span>Target Profit</span>
-
-        <strong>₹5</strong>
-
-    </div>
-
-
-    <div class="config-row">
-
-        <span>Stop Loss</span>
-
-        <strong>₹-20</strong>
-
-    </div>
-
-
-    <div class="config-row">
-
-        <span>Total Profit Target</span>
-
-        <strong>₹1000</strong>
-
-    </div>
-
-
-    <div class="config-row">
-
-        <span>Lot Size</span>
-
-        <strong>20</strong>
-
-    </div>
-
-
-    <div class="config-row">
-
-        <span>Last Entry</span>
-
-        <strong>15:00</strong>
-
-    </div>
-
-
-    <div class="config-row">
-
-        <span>Force Exit</span>
-
-        <strong>15:15</strong>
-
-    </div>
-
-
-</div>
-
-
-
-<div class="footer">
-
-    SENSEX Option Bot • Kotak Neo
-
-</div>
-
-
-</main>
-
-<!-- ================= JAVASCRIPT ================= -->
 
 <script>
 
+let lastRunningState = false;
 
-async function getStatus() {
 
-    try {
+/* FORMAT MONEY */
+function formatMoney(value) {
 
-        const response =
-            await fetch("/api/status");
+    let number = Number(value);
 
-        const data =
-            await response.json();
-
-        updateDashboard(data);
-
+    if (isNaN(number)) {
+        number = 0;
     }
 
-    catch (error) {
-
-        document.getElementById("message").innerText =
-            "Unable to connect to bot";
-
-    }
-
+    return "₹" + number.toFixed(2);
 }
 
 
-
+/* UPDATE DASHBOARD */
 function updateDashboard(data) {
-
-
-    const statusBadge =
-        document.getElementById("statusBadge");
-
-
-    const statusText =
-        document.getElementById("statusText");
-
-
-    const statusTitle =
-        document.getElementById("statusTitle");
-
-
-    const statusDescription =
-        document.getElementById("statusDescription");
-
-
-    const profitElement =
-        document.getElementById("profit");
-
-
-    const tradesElement =
-        document.getElementById("trades");
-
-
-    const currentTradeElement =
-        document.getElementById("currentTrade");
-
-
-    const tradeDetails =
-        document.getElementById("tradeDetails");
-
 
     const running =
         data.running ??
         data.bot_running ??
         false;
-
 
     const profit =
         data.total_profit ??
@@ -1126,13 +639,11 @@ function updateDashboard(data) {
         data.profit ??
         0;
 
-
     const trades =
         data.completed_trades ??
         data.trade_count ??
         data.trades ??
         0;
-
 
     const currentTrade =
         data.current_trade ??
@@ -1140,226 +651,287 @@ function updateDashboard(data) {
         null;
 
 
-
     /* STATUS */
+
+    const statusDot =
+        document.getElementById("statusDot");
+
+    const statusText =
+        document.getElementById("statusText");
 
     if (running) {
 
-        statusBadge.className =
-            "status-badge running";
+        statusDot.className =
+            "status-dot running";
 
-        statusText.innerText =
+        statusText.className =
+            "status-text running";
+
+        statusText.textContent =
             "RUNNING";
 
-        statusTitle.innerText =
-            "Bot is running";
+    } else {
 
-        statusDescription.innerText =
-            "The trading system is monitoring the market.";
+        statusDot.className =
+            "status-dot stopped";
 
-    }
+        statusText.className =
+            "status-text stopped";
 
-    else {
-
-        statusBadge.className =
-            "status-badge";
-
-        statusText.innerText =
+        statusText.textContent =
             "STOPPED";
-
-        statusTitle.innerText =
-            "Bot is stopped";
-
-        statusDescription.innerText =
-            "Start the bot to begin monitoring the market.";
-
     }
-
 
 
     /* PROFIT */
 
-    const numericProfit =
-        Number(profit) || 0;
+    const profitElement =
+        document.getElementById("profit");
 
-    profitElement.innerText =
-        "₹" + numericProfit.toFixed(2);
+    profitElement.textContent =
+        formatMoney(profit);
 
+    if (Number(profit) >= 0) {
+
+        profitElement.className =
+            "profit-value profit-positive";
+
+    } else {
+
+        profitElement.className =
+            "profit-value profit-negative";
+    }
 
 
     /* TRADES */
 
-    tradesElement.innerText =
-        trades;
-
+    document.getElementById("trades")
+        .textContent = trades;
 
 
     /* CURRENT TRADE */
 
-    currentTradeElement.innerText =
-        currentTrade || "None";
+    const smallTrade =
+        document.getElementById("currentTradeSmall");
+
+    const tradeBadge =
+        document.getElementById("tradeBadge");
+
+    const tradeContent =
+        document.getElementById("tradeContent");
 
 
-    tradeDetails.innerText =
-        currentTrade || "No active trade";
+    if (currentTrade) {
 
+        smallTrade.textContent = "ACTIVE";
+
+        tradeBadge.textContent =
+            "ACTIVE TRADE";
+
+        let html = "";
+
+
+        if (typeof currentTrade === "object") {
+
+            for (const key in currentTrade) {
+
+                let value =
+                    currentTrade[key];
+
+                if (value === null ||
+                    value === undefined) {
+
+                    value = "—";
+                }
+
+                html +=
+                    "<div><strong>" +
+                    formatKey(key) +
+                    ":</strong> " +
+                    value +
+                    "</div>";
+            }
+
+        } else {
+
+            html =
+                "<div><strong>Trade:</strong> " +
+                currentTrade +
+                "</div>";
+        }
+
+
+        tradeContent.innerHTML = html;
+
+    } else {
+
+        smallTrade.textContent = "—";
+
+        tradeBadge.textContent =
+            "NO ACTIVE TRADE";
+
+        tradeContent.innerHTML =
+            '<div class="no-trade">No active trade</div>';
+    }
+
+
+    /* BUTTONS */
+
+    const startBtn =
+        document.getElementById("startBtn");
+
+    const stopBtn =
+        document.getElementById("stopBtn");
+
+
+    startBtn.disabled = running;
+
+    stopBtn.disabled = !running;
+
+
+    lastRunningState = running;
 }
 
 
+/* FORMAT OBJECT KEY */
+function formatKey(key) {
 
-/* ================= START ================= */
+    return key
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, function(letter) {
+            return letter.toUpperCase();
+        });
+}
 
+
+/* GET STATUS */
+async function getStatus() {
+
+    try {
+
+        const response =
+            await fetch("/api/status", {
+                method: "GET",
+                cache: "no-store"
+            });
+
+        const data =
+            await response.json();
+
+        updateDashboard(data);
+
+    } catch (error) {
+
+        console.error(
+            "Status error:",
+            error
+        );
+    }
+}
+
+
+/* START BOT */
 async function startBot() {
-
-
-    const message =
-        document.getElementById("message");
-
 
     const button =
         document.getElementById("startBtn");
 
-
-    message.innerText =
-        "Starting bot...";
-
-
-    button.disabled =
-        true;
+    button.disabled = true;
+    button.textContent = "STARTING...";
 
 
     try {
 
-
         const response =
             await fetch("/api/start", {
-
-                method: "POST",
-
-                headers: {
-                    "Content-Type": "application/json"
-                }
-
+                method: "POST"
             });
-
 
         const data =
             await response.json();
 
-
-        message.innerText =
-            data.message ||
-            data.status ||
-            "Bot started";
-
+        console.log(data);
 
         await getStatus();
 
+    } catch (error) {
 
+        console.error(
+            "Start error:",
+            error
+        );
+
+        alert(
+            "Unable to start bot."
+        );
+
+    } finally {
+
+        button.textContent =
+            "START BOT";
+
+        await getStatus();
     }
-
-    catch (error) {
-
-        message.innerText =
-            "Error starting bot";
-
-    }
-
-
-    finally {
-
-        button.disabled =
-            false;
-
-    }
-
 }
 
 
-
-/* ================= STOP ================= */
-
+/* STOP BOT */
 async function stopBot() {
-
-
-    const message =
-        document.getElementById("message");
-
 
     const button =
         document.getElementById("stopBtn");
 
-
-    message.innerText =
-        "Stopping bot...";
-
-
-    button.disabled =
-        true;
+    button.disabled = true;
+    button.textContent = "STOPPING...";
 
 
     try {
 
-
         const response =
             await fetch("/api/stop", {
-
-                method: "POST",
-
-                headers: {
-                    "Content-Type": "application/json"
-                }
-
+                method: "POST"
             });
-
 
         const data =
             await response.json();
 
-
-        message.innerText =
-            data.message ||
-            data.status ||
-            "Bot stopped";
-
+        console.log(data);
 
         await getStatus();
 
+    } catch (error) {
 
+        console.error(
+            "Stop error:",
+            error
+        );
+
+        alert(
+            "Unable to stop bot."
+        );
+
+    } finally {
+
+        button.textContent =
+            "STOP BOT";
+
+        await getStatus();
     }
-
-    catch (error) {
-
-        message.innerText =
-            "Error stopping bot";
-
-    }
-
-
-    finally {
-
-        button.disabled =
-            false;
-
-    }
-
 }
 
 
-
-/* ================= AUTO REFRESH ================= */
-
+/* INITIAL LOAD */
 getStatus();
 
 
+/* AUTO REFRESH */
 setInterval(
     getStatus,
     3000
 );
 
-
 </script>
 
 </body>
-
 </html>
+```
