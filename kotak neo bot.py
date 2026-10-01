@@ -189,10 +189,26 @@ def login():
 
 def get_option_chain():
 
+    global last_error
+
     if client is None:
+
+        last_error = (
+            "NeoAPI client is None."
+        )
+
+        print(
+            "OPTION CHAIN ERROR: client is None"
+        )
+
         return None
 
     try:
+
+        print()
+        print("=" * 60)
+        print("REQUESTING SENSEX OPTION CHAIN")
+        print("=" * 60)
 
         response = client.option_chain(
             exchange=EXCHANGE,
@@ -201,15 +217,63 @@ def get_option_chain():
             count=100
         )
 
+        print(
+            "Option-chain response type:",
+            type(response).__name__
+        )
+
+        print(
+            "Option-chain response:"
+        )
+
+        print(response)
+
+        if response is None:
+
+            last_error = (
+                "NeoAPI returned None for option chain."
+            )
+
+            return None
+
+        if isinstance(response, dict):
+
+            print(
+                "Response keys:",
+                list(response.keys())
+            )
+
+            if response.get("stat") == "Not_Ok":
+
+                last_error = (
+                    "NeoAPI option-chain error: "
+                    + str(response)
+                )
+
+                print(
+                    last_error
+                )
+
+                return None
+
         return response
 
     except Exception as e:
 
-        print("Option chain error:", e)
+        last_error = (
+            f"Option chain error: "
+            f"{type(e).__name__}: {e}"
+        )
+
+        print(
+            last_error
+        )
+
+        print(
+            traceback.format_exc()
+        )
 
         return None
-
-
 # ============================================================
 # NORMALIZE OPTION CHAIN
 # ============================================================
