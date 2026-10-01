@@ -63,4 +63,3 @@ if missing:
         print(
             f"  - {item}"
         )
-```
