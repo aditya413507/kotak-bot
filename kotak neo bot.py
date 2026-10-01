@@ -1124,9 +1124,10 @@ def run_trade():
 # ============================================================
 
 def bot_worker():
-
+    
     global bot_running
     global last_error
+    global current_trade
 
     print()
     print("==============================================")
